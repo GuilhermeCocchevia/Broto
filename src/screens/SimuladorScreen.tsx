@@ -1,9 +1,12 @@
 import { useEffect, useMemo } from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors } from '../theme/colors';
 import { useTransacoesStore } from '../store/useTransacoesStore';
 import { useSimulacoesStore } from '../store/useSimulacoesStore';
 import { calcularSaldoProjetado, calcularRendaFixaMedia } from '../logic/projecao';
+import type { RootStackParamList } from '../navigation/RootNavigator';
 
 const MESES_PRA_FRENTE = 6;
 
@@ -15,6 +18,7 @@ function formatarReal(valor: number): string {
 }
 
 export default function SimuladorScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const transacoes = useTransacoesStore((state) => state.transacoes);
   const simulacoes = useSimulacoesStore((state) => state.simulacoes);
   const carregarTransacoes = useTransacoesStore((state) => state.carregar);
@@ -54,6 +58,13 @@ export default function SimuladorScreen() {
       <Text style={styles.rendaFixa}>
         Renda fixa projetada: {formatarReal(rendaFixaMensal)}/mês
       </Text>
+
+      <Pressable
+        style={styles.botaoSecundario}
+        onPress={() => navigation.navigate('NovaSimulacao')}
+      >
+        <Text style={styles.botaoSecundarioTexto}>+ nova simulação</Text>
+      </Pressable>
 
       <FlatList
         style={styles.lista}
@@ -98,6 +109,18 @@ const styles = StyleSheet.create({
     color: colors.primaryDark,
     fontWeight: '600',
     marginTop: 8,
+  },
+  botaoSecundario: {
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.primaryDark,
+  },
+  botaoSecundarioTexto: {
+    color: colors.primaryDark,
+    fontWeight: '600',
   },
   lista: {
     width: '100%',

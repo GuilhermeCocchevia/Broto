@@ -6,15 +6,6 @@ import { colors } from '../theme/colors';
 import { useCategoriasStore } from '../store/useCategoriasStore';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
-// Nomes/cores de exemplo só pra termos algo diferente a cada toque do botão,
-// enquanto não existe uma tela de verdade de "criar categoria". Isso é só um
-// teste visual temporário — vai sumir quando entrar o formulário real.
-const EXEMPLOS = [
-  { nome: 'Alimentação', cor: colors.accent },
-  { nome: 'Transporte', cor: colors.secondary },
-  { nome: 'Salário', cor: colors.success },
-];
-
 export default function DashboardScreen() {
   // useNavigation<...> tipado com RootStackParamList: dá autocomplete e erro de
   // compilação se você tentar navigation.navigate('TelaQueNaoExiste').
@@ -25,7 +16,6 @@ export default function DashboardScreen() {
   // `categorias` muda — não quando `carregando` muda, por exemplo.
   const categorias = useCategoriasStore((state) => state.categorias);
   const carregar = useCategoriasStore((state) => state.carregar);
-  const adicionar = useCategoriasStore((state) => state.adicionar);
 
   // Array vazio de dependências = roda só uma vez, quando a tela monta na tela
   // (igual componentDidMount das classes antigas do React).
@@ -33,29 +23,24 @@ export default function DashboardScreen() {
     carregar();
   }, [carregar]);
 
-  function adicionarExemplo() {
-    const exemplo = EXEMPLOS[categorias.length % EXEMPLOS.length];
-    adicionar({ nome: exemplo.nome, tipo: 'despesa', cor: exemplo.cor });
-  }
-
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Dashboard</Text>
       <Text style={styles.subtitle}>Seu resumo financeiro vai aparecer aqui.</Text>
 
-      <Pressable style={styles.botao} onPress={adicionarExemplo}>
-        <Text style={styles.botaoTexto}>+ categoria de teste</Text>
-      </Pressable>
-
-      <Pressable style={styles.botaoSecundario} onPress={() => navigation.navigate('Simulador')}>
-        <Text style={styles.botaoSecundarioTexto}>Ver simulador</Text>
+      <Pressable style={styles.botao} onPress={() => navigation.navigate('NovaTransacao')}>
+        <Text style={styles.botaoTexto}>+ nova transação</Text>
       </Pressable>
 
       <Pressable
         style={styles.botaoSecundario}
-        onPress={() => navigation.navigate('NovaTransacao')}
+        onPress={() => navigation.navigate('NovaCategoria')}
       >
-        <Text style={styles.botaoSecundarioTexto}>+ nova transação</Text>
+        <Text style={styles.botaoSecundarioTexto}>+ nova categoria</Text>
+      </Pressable>
+
+      <Pressable style={styles.botaoSecundario} onPress={() => navigation.navigate('Simulador')}>
+        <Text style={styles.botaoSecundarioTexto}>Ver simulador</Text>
       </Pressable>
 
       <FlatList

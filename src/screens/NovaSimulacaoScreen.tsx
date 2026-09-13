@@ -4,43 +4,43 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors } from '../theme/colors';
 import { useCategoriasStore } from '../store/useCategoriasStore';
-import { useTransacoesStore } from '../store/useTransacoesStore';
+import { useSimulacoesStore } from '../store/useSimulacoesStore';
 import { OpcaoBotao } from '../components/OpcaoBotao';
 import type { RootStackParamList } from '../navigation/RootNavigator';
-import type { TipoTransacao, Frequencia } from '../types/models';
 
-// Formulário genérico de lançamento — serve tanto pra registrar um salário já
-// recebido (receita, avulsa, com data no passado) quanto uma despesa comum, ou
-// uma receita/despesa recorrente. Usamos useState pra cada campo (formulário
-// "controlado": o valor mostrado no input sempre vem do estado do React, nunca
-// direto do que o usuário digitou) em vez de uma biblioteca de formulário —
-// com esses ~6 campos ainda compensa fazer na mão.
-export default function NovaTransacaoScreen() {
+// Formulário de "e se eu comprar isso?" — cria uma Simulacao (compra
+// hipotética, possivelmente parcelada) que entra na projeção do Simulador
+// sem nunca virar uma Transacao de verdade.
+export default function NovaSimulacaoScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const categorias = useCategoriasStore((state) => state.categorias);
-  const adicionar = useTransacoesStore((state) => state.adicionar);
+  const adicionar = useSimulacoesStore((state) => state.adicionar);
 
   const [descricao, setDescricao] = useState('');
-  const [valorTexto, setValorTexto] = useState('');
-  const [data, setData] = useState(new Date().toISOString().slice(0, 10));
-  const [tipo, setTipo] = useState<TipoTransacao>('despesa');
-  const [frequencia, setFrequencia] = useState<Frequencia>('unica');
+  const [valorTotalTexto, setValorTotalTexto] = useState('');
+  const [parcelasTexto, setParcelasTexto] = useState('1');
+  const [dataInicio, setDataInicio] = useState(new Date().toISOString().slice(0, 10));
   const [categoriaId, setCategoriaId] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
   // async: só volta pra tela anterior depois de confirmar que gravou de
   // verdade — ver o comentário equivalente em NovaCategoriaScreen.tsx.
   async function salvar() {
-    // valorTexto vem de um TextInput, ou seja, sempre é string — Number('abc')
-    // não dá erro, devolve NaN ("Not a Number"), por isso a checagem explícita.
-    const valor = Number(valorTexto.replace(',', '.'));
+    const valorTotal = Number(valorTotalTexto.replace(',', '.'));
+    // parcelas vem de TextInput com teclado numérico, mas ainda assim é texto
+    // até aqui — Number.isInteger confere que não veio algo tipo "3.5x".
+    const parcelas = Number(parcelasTexto);
 
     if (!descricao.trim()) {
       setErro('Preencha a descrição.');
       return;
     }
-    if (!valorTexto || Number.isNaN(valor) || valor <= 0) {
-      setErro('Informe um valor válido, maior que zero.');
+    if (!valorTotalTexto || Number.isNaN(valorTotal) || valorTotal <= 0) {
+      setErro('Informe um valor total válido, maior que zero.');
+      return;
+    }
+    if (!Number.isInteger(parcelas) || parcelas <= 0) {
+      setErro('Número de parcelas precisa ser um número inteiro maior que zero.');
       return;
     }
     if (!categoriaId) {
@@ -52,12 +52,10 @@ export default function NovaTransacaoScreen() {
     try {
       await adicionar({
         descricao: descricao.trim(),
-        valor,
-        data,
-        tipo,
+        valorTotal,
+        parcelas,
+        dataInicio,
         categoriaId,
-        frequencia,
-        dataFim: null,
       });
       navigation.goBack();
     } catch (erroAoSalvar) {
@@ -72,45 +70,34 @@ export default function NovaTransacaoScreen() {
         style={styles.input}
         value={descricao}
         onChangeText={setDescricao}
-        placeholder="Ex: Salário de agosto"
+        placeholder="Ex: TV nova"
       />
 
-      <Text style={styles.rotulo}>Valor (R$)</Text>
+      <Text style={styles.rotulo}>Valor total (R$)</Text>
       <TextInput
         style={styles.input}
-        value={valorTexto}
-        onChangeText={setValorTexto}
-        placeholder="Ex: 3000"
+        value={valorTotalTexto}
+        onChangeText={setValorTotalTexto}
+        placeholder="Ex: 1000"
         keyboardType="decimal-pad"
       />
 
-      <Text style={styles.rotulo}>Data</Text>
+      <Text style={styles.rotulo}>Parcelas (1 = à vista)</Text>
       <TextInput
         style={styles.input}
-        value={data}
-        onChangeText={setData}
-        placeholder="AAAA-MM-DD"
+        value={parcelasTexto}
+        onChangeText={setParcelasTexto}
+        placeholder="Ex: 10"
+        keyboardType="number-pad"
       />
 
-      <Text style={styles.rotulo}>Tipo</Text>
-      <View style={styles.opcoes}>
-        <OpcaoBotao label="Receita" selecionado={tipo === 'receita'} onPress={() => setTipo('receita')} />
-        <OpcaoBotao label="Despesa" selecionado={tipo === 'despesa'} onPress={() => setTipo('despesa')} />
-      </View>
-
-      <Text style={styles.rotulo}>Frequência</Text>
-      <View style={styles.opcoes}>
-        <OpcaoBotao
-          label="Avulsa (única vez)"
-          selecionado={frequencia === 'unica'}
-          onPress={() => setFrequencia('unica')}
-        />
-        <OpcaoBotao
-          label="Mensal (repete)"
-          selecionado={frequencia === 'mensal'}
-          onPress={() => setFrequencia('mensal')}
-        />
-      </View>
+      <Text style={styles.rotulo}>Data da 1ª parcela</Text>
+      <TextInput
+        style={styles.input}
+        value={dataInicio}
+        onChangeText={setDataInicio}
+        placeholder="AAAA-MM-DD"
+      />
 
       <Text style={styles.rotulo}>Categoria</Text>
       <View style={styles.opcoes}>
