@@ -10,6 +10,7 @@
     "babel-preset-expo": "~57.0.0",
     "drizzle-orm": "^0.45.2",
     "expo": "~57.0.22",
+    "expo-crypto": "~57.0.3",
     "expo-sqlite": "~57.0.3",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",
