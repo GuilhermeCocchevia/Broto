@@ -1,7 +1,10 @@
 import { useEffect } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors } from '../theme/colors';
 import { useCategoriasStore } from '../store/useCategoriasStore';
+import type { RootStackParamList } from '../navigation/RootNavigator';
 
 // Nomes/cores de exemplo só pra termos algo diferente a cada toque do botão,
 // enquanto não existe uma tela de verdade de "criar categoria". Isso é só um
@@ -13,6 +16,10 @@ const EXEMPLOS = [
 ];
 
 export default function DashboardScreen() {
+  // useNavigation<...> tipado com RootStackParamList: dá autocomplete e erro de
+  // compilação se você tentar navigation.navigate('TelaQueNaoExiste').
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
   // Selector: em vez de pegar a store inteira (`useCategoriasStore()`), pegamos só
   // o pedacinho que essa tela usa. Assim o componente só re-renderiza quando
   // `categorias` muda — não quando `carregando` muda, por exemplo.
@@ -38,6 +45,10 @@ export default function DashboardScreen() {
 
       <Pressable style={styles.botao} onPress={adicionarExemplo}>
         <Text style={styles.botaoTexto}>+ categoria de teste</Text>
+      </Pressable>
+
+      <Pressable style={styles.botaoSecundario} onPress={() => navigation.navigate('Simulador')}>
+        <Text style={styles.botaoSecundarioTexto}>Ver simulador</Text>
       </Pressable>
 
       <FlatList
@@ -81,6 +92,18 @@ const styles = StyleSheet.create({
   },
   botaoTexto: {
     color: colors.surface,
+    fontWeight: '600',
+  },
+  botaoSecundario: {
+    marginTop: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.primaryDark,
+  },
+  botaoSecundarioTexto: {
+    color: colors.primaryDark,
     fontWeight: '600',
   },
   lista: {
