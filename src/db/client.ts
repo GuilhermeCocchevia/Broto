@@ -9,6 +9,12 @@ import * as schema from './schema';
 // aconteceria se guardássemos tudo só em variável/estado).
 const sqlite = openDatabaseSync('broto.db');
 
+// Por padrão, o SQLite NÃO aplica as regras de foreign key (o `.references()`
+// que colocamos em schema.ts) mesmo elas existindo na tabela — é preciso ligar
+// essa checagem explicitamente por conexão. Sem essa linha, seria possível
+// inserir uma transação com categoriaId de uma categoria que não existe.
+sqlite.execSync('PRAGMA foreign_keys = ON;');
+
 // Passar `{ schema }` é o que permite usar db.query.transacoes.findMany({ with: { categoria: true } })
 // mais na frente — o Drizzle usa o schema pra saber como montar esses joins sozinho.
 export const db = drizzle(sqlite, { schema });

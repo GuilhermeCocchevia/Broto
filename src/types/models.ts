@@ -31,9 +31,11 @@ export type Transacao = {
   tipo: TipoTransacao;
   categoriaId: string;
   frequencia: Frequencia;
-  // O `?` marca campo opcional: só faz sentido existir quando frequencia === 'mensal'.
-  // undefined = repete pra sempre (sem data pra parar, tipo salário).
-  dataFim?: string;
+  // SQL não tem "undefined" — uma coluna sempre existe na linha, só que pode
+  // guardar NULL. Por isso aqui é `string | null` (sempre presente) e não um
+  // campo opcional com `?`: é o mesmo formato que volta quando lemos do banco.
+  // null = repete pra sempre (sem data pra parar, tipo salário).
+  dataFim: string | null;
 };
 
 export type Simulacao = {
