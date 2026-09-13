@@ -41,12 +41,48 @@ function diferencaEmMeses(mesA: string, mesB: string): number {
   return (anoA * 12 + mA) - (anoB * 12 + mB);
 }
 
+// Quantos salários olhar pra trás pra calcular a renda fixa projetada.
+const QUANTIDADE_SALARIOS_PARA_MEDIA = 3;
+
+// Estima a "renda fixa mensal" a partir dos últimos salários já recebidos,
+// pra usar como projeção nos meses futuros — a ideia é a mesma de fazer uma
+// média das últimas entradas de dinheiro pra saber quanto esperar chegar por
+// mês, mesmo sem ter certeza do valor exato (salário pode variar um pouco por
+// causa de hora extra, comissão, etc).
+//
+// Só entram receitas com frequencia 'unica' (um recebimento que já aconteceu
+// de verdade, ex: "salário de agosto"). Uma receita 'mensal' (ex: um auxílio
+// do governo com valor fixo, cadastrado como recorrente) não entra aqui —
+// ela já é somada à parte dentro de calcularSaldoProjetado, então somar de
+// novo aqui contaria ela duas vezes.
+export function calcularRendaFixaMedia(transacoes: Transacao[]): number {
+  const receitasAvulsas = transacoes.filter(
+    (transacao) => transacao.tipo === 'receita' && transacao.frequencia === 'unica',
+  );
+
+  // Ordena da mais recente pra mais antiga (comparação de string ISO de novo,
+  // igual explicado em formatarMes) e pega só as N últimas.
+  const maisRecentesPrimeiro = [...receitasAvulsas].sort((a, b) => (a.data < b.data ? 1 : -1));
+  const ultimosSalarios = maisRecentesPrimeiro.slice(0, QUANTIDADE_SALARIOS_PARA_MEDIA);
+
+  if (ultimosSalarios.length === 0) {
+    return 0;
+  }
+
+  const soma = ultimosSalarios.reduce((total, transacao) => total + transacao.valor, 0);
+  return soma / ultimosSalarios.length;
+}
+
 export function calcularSaldoProjetado(
   transacoes: Transacao[],
   simulacoes: Simulacao[],
   mesInicial: string,
   quantidadeMeses: number,
   saldoInicial: number = 0,
+  // Valor fixo somado como entrada em TODO mês projetado (normalmente o
+  // resultado de calcularRendaFixaMedia). Fica de fora do saldo dos meses
+  // passados/atuais reais porque essa é só uma estimativa pro futuro.
+  rendaFixaMensal: number = 0,
 ): MesProjetado[] {
   const resultado: MesProjetado[] = [];
   let saldoAcumulado = saldoInicial;
@@ -55,6 +91,10 @@ export function calcularSaldoProjetado(
     const mes = adicionarMeses(mesInicial, i);
     let entradas = 0;
     let saidas = 0;
+    // Se esse mês já tem alguma receita de verdade lançada (ex: o próprio
+    // salário que gerou a média), não faz sentido SOMAR a renda fixa em cima
+    // — ela é só uma estimativa pra preencher meses sem nenhum dado real.
+    let jaTemReceitaRegistradaNesseMes = false;
 
     for (const transacao of transacoes) {
       const mesDaTransacao = formatarMes(transacao.data);
@@ -68,9 +108,14 @@ export function calcularSaldoProjetado(
 
       if (transacao.tipo === 'receita') {
         entradas += transacao.valor;
+        jaTemReceitaRegistradaNesseMes = true;
       } else {
         saidas += transacao.valor;
       }
+    }
+
+    if (!jaTemReceitaRegistradaNesseMes) {
+      entradas += rendaFixaMensal;
     }
 
     for (const simulacao of simulacoes) {

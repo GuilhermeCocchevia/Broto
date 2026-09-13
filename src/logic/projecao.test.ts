@@ -1,4 +1,4 @@
-import { calcularSaldoProjetado } from './projecao';
+import { calcularSaldoProjetado, calcularRendaFixaMedia } from './projecao';
 import type { Transacao, Simulacao } from '../types/models';
 
 // Helpers só pra não repetir todo campo em toda transação/simulação de teste —
@@ -90,4 +90,54 @@ test('saldo acumulado combina saldo inicial, transações e simulações mês a 
   // Mês 1: 500 + 1000 - 100 = 1400. Mês 2: 1400 + 1000 - 100 = 2300.
   // Mês 3: parcelas acabaram, só entra o salário: 2300 + 1000 = 3300.
   expect(resultado.map((m) => m.saldo)).toEqual([1400, 2300, 3300]);
+});
+
+test('calcularRendaFixaMedia tira a média só das 3 receitas avulsas mais recentes', () => {
+  const salarios = [
+    criarTransacao({ tipo: 'receita', frequencia: 'unica', valor: 3000, data: '2026-06-05' }),
+    criarTransacao({ tipo: 'receita', frequencia: 'unica', valor: 3200, data: '2026-07-05' }),
+    criarTransacao({ tipo: 'receita', frequencia: 'unica', valor: 2800, data: '2026-08-05' }),
+    // Mais antigo que os 3 já contados — não deveria entrar na média.
+    criarTransacao({ tipo: 'receita', frequencia: 'unica', valor: 100000, data: '2026-01-05' }),
+  ];
+
+  expect(calcularRendaFixaMedia(salarios)).toBe((3000 + 3200 + 2800) / 3);
+});
+
+test('calcularRendaFixaMedia ignora despesas e receitas recorrentes (já contadas à parte)', () => {
+  const transacoes = [
+    criarTransacao({ tipo: 'receita', frequencia: 'unica', valor: 3000, data: '2026-08-05' }),
+    criarTransacao({ tipo: 'despesa', frequencia: 'unica', valor: 500, data: '2026-08-10' }),
+    criarTransacao({ tipo: 'receita', frequencia: 'mensal', valor: 600, data: '2026-01-01' }),
+  ];
+
+  expect(calcularRendaFixaMedia(transacoes)).toBe(3000);
+});
+
+test('calcularRendaFixaMedia devolve 0 sem nenhuma receita avulsa registrada', () => {
+  expect(calcularRendaFixaMedia([])).toBe(0);
+});
+
+test('rendaFixaMensal em calcularSaldoProjetado soma como entrada em todos os meses', () => {
+  const resultado = calcularSaldoProjetado([], [], '2026-01', 3, 0, 3000);
+
+  expect(resultado.map((m) => m.entradas)).toEqual([3000, 3000, 3000]);
+  expect(resultado.map((m) => m.saldo)).toEqual([3000, 6000, 9000]);
+});
+
+test('rendaFixaMensal não soma em cima de um mês que já tem receita real registrada', () => {
+  // Bug encontrado testando no simulador de verdade: o salário que gerou a
+  // média (setembro) não pode contar 2x no próprio mês em que foi lançado.
+  const salarioDeSetembro = criarTransacao({
+    tipo: 'receita',
+    frequencia: 'unica',
+    valor: 3000,
+    data: '2026-09-13',
+  });
+
+  const resultado = calcularSaldoProjetado([salarioDeSetembro], [], '2026-09', 3, 0, 3000);
+
+  // Setembro já tinha o salário real (3000) — a renda fixa não soma de novo.
+  // Outubro e novembro não têm nenhuma receita registrada, então usam a média.
+  expect(resultado.map((m) => m.entradas)).toEqual([3000, 3000, 3000]);
 });

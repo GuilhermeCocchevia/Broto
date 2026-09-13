@@ -3,7 +3,7 @@ import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../theme/colors';
 import { useTransacoesStore } from '../store/useTransacoesStore';
 import { useSimulacoesStore } from '../store/useSimulacoesStore';
-import { calcularSaldoProjetado } from '../logic/projecao';
+import { calcularSaldoProjetado, calcularRendaFixaMedia } from '../logic/projecao';
 
 const MESES_PRA_FRENTE = 6;
 
@@ -25,20 +25,35 @@ export default function SimuladorScreen() {
     carregarSimulacoes();
   }, [carregarTransacoes, carregarSimulacoes]);
 
+  // Renda fixa projetada = média dos últimos salários avulsos já registrados
+  // (ver calcularRendaFixaMedia). Sem pelo menos 1 receita avulsa cadastrada,
+  // isso fica 0 — não tem como estimar renda futura sem nenhum histórico real.
+  const rendaFixaMensal = useMemo(() => calcularRendaFixaMedia(transacoes), [transacoes]);
+
   // useMemo evita recalcular a projeção em todo re-render — só recalcula quando
   // transacoes ou simulacoes realmente mudam (ex: depois de uma nova compra
   // simulada). Ainda não existe uma tela de "saldo atual", então por enquanto
-  // a projeção parte de R$ 0 — isso muda quando o controle financeiro atual
-  // (Fase 1 do app) existir de verdade.
+  // a projeção parte de R$ 0 de saldo — isso muda quando o controle financeiro
+  // atual (Fase 1 do app) existir de verdade.
   const meses = useMemo(() => {
     const mesAtual = new Date().toISOString().slice(0, 7);
-    return calcularSaldoProjetado(transacoes, simulacoes, mesAtual, MESES_PRA_FRENTE);
-  }, [transacoes, simulacoes]);
+    return calcularSaldoProjetado(
+      transacoes,
+      simulacoes,
+      mesAtual,
+      MESES_PRA_FRENTE,
+      0,
+      rendaFixaMensal,
+    );
+  }, [transacoes, simulacoes, rendaFixaMensal]);
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Simulador</Text>
       <Text style={styles.subtitle}>Projeção de saldo pros próximos {MESES_PRA_FRENTE} meses.</Text>
+      <Text style={styles.rendaFixa}>
+        Renda fixa projetada: {formatarReal(rendaFixaMensal)}/mês
+      </Text>
 
       <FlatList
         style={styles.lista}
@@ -77,6 +92,12 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textAlign: 'center',
     paddingHorizontal: 32,
+  },
+  rendaFixa: {
+    fontSize: 13,
+    color: colors.primaryDark,
+    fontWeight: '600',
+    marginTop: 8,
   },
   lista: {
     width: '100%',

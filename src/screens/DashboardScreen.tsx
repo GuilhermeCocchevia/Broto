@@ -51,6 +51,13 @@ export default function DashboardScreen() {
         <Text style={styles.botaoSecundarioTexto}>Ver simulador</Text>
       </Pressable>
 
+      <Pressable
+        style={styles.botaoSecundario}
+        onPress={() => navigation.navigate('NovaTransacao')}
+      >
+        <Text style={styles.botaoSecundarioTexto}>+ nova transação</Text>
+      </Pressable>
+
       <FlatList
         style={styles.lista}
         data={categorias}
