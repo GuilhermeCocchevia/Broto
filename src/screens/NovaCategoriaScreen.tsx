@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -7,8 +7,14 @@ import { colors } from '../theme/colors';
 import { useCategoriasStore } from '../store/useCategoriasStore';
 import { OpcaoBotao } from '../components/OpcaoBotao';
 import { mensagemDeErro } from '../utils/mensagemDeErro';
+import { normalizarTexto } from '../utils/normalizarTexto';
+import { SUGESTOES_RECEITA, SUGESTOES_DESPESA } from '../data/sugestoesCategorias';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import type { TipoTransacao } from '../types/models';
+
+// Quantas sugestões mostrar no máximo — sem isso, digitar uma letra comum
+// (tipo "a") poderia listar a metade das sugestões de uma vez.
+const MAXIMO_SUGESTOES = 6;
 
 // Paleta de cores fixa pra escolher a "cor da categoria" — mais simples do
 // que um seletor de cor livre (roda de cores, etc.), e garante que toda
@@ -38,6 +44,23 @@ export default function NovaCategoriaScreen() {
   const [cor, setCor] = useState(CORES_DISPONIVEIS[0]);
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  // Controla se as sugestões aparecem: só faz sentido mostrar enquanto o
+  // usuário está de fato digitando nesse campo, não depois que ele já saiu.
+  const [campoNomeFocado, setCampoNomeFocado] = useState(false);
+
+  // Sugestões filtradas pelo que já foi digitado, olhando só a lista do tipo
+  // selecionado (receita ou despesa) — muda sozinho se o usuário trocar o
+  // tipo. `normalizarTexto` faz a busca ignorar acento e maiúsculo/minúsculo,
+  // então digitar "beneficio" encontra "Benefício do governo".
+  const sugestoes = useMemo(() => {
+    const nomeNormalizado = normalizarTexto(nome);
+    if (!nomeNormalizado) return [];
+
+    const listaDoTipo = tipo === 'receita' ? SUGESTOES_RECEITA : SUGESTOES_DESPESA;
+    return listaDoTipo
+      .filter((sugestao) => normalizarTexto(sugestao).includes(nomeNormalizado))
+      .slice(0, MAXIMO_SUGESTOES);
+  }, [nome, tipo]);
 
   // Muda o título no cabeçalho pra deixar claro se é edição ou criação —
   // `navigation.setOptions` é como você muda as opções da própria tela (título,
@@ -110,7 +133,33 @@ export default function NovaCategoriaScreen() {
         value={nome}
         onChangeText={setNome}
         placeholder="Ex: Alimentação"
+        onFocus={() => setCampoNomeFocado(true)}
+        onBlur={() => {
+          // Pequeno atraso de propósito: sem ele, tocar num chip de sugestão
+          // faz o TextInput perder o foco (onBlur) ANTES do onPress do chip
+          // processar o toque — a lista de sugestões some e o clique se
+          // perde no meio do caminho. 150ms é tempo de sobra pro toque ser
+          // processado, mas curto o bastante pra não incomodar quem só quer
+          // sair do campo mesmo.
+          setTimeout(() => setCampoNomeFocado(false), 150);
+        }}
       />
+
+      {campoNomeFocado && sugestoes.length > 0 && (
+        <View style={styles.opcoes}>
+          {sugestoes.map((sugestao) => (
+            <OpcaoBotao
+              key={sugestao}
+              label={sugestao}
+              selecionado={false}
+              onPress={() => {
+                setNome(sugestao);
+                setCampoNomeFocado(false);
+              }}
+            />
+          ))}
+        </View>
+      )}
 
       <Text style={styles.rotulo}>Tipo</Text>
       <View style={styles.opcoes}>
