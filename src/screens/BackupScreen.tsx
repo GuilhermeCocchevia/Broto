@@ -8,6 +8,7 @@ import { useCategoriasStore } from '../store/useCategoriasStore';
 import { useTransacoesStore } from '../store/useTransacoesStore';
 import { useSimulacoesStore } from '../store/useSimulacoesStore';
 import { useSaldoInicialStore } from '../store/useSaldoInicialStore';
+import { useMetaReservaStore } from '../store/useMetaReservaStore';
 import { montarBackup, lerBackup } from '../logic/backup';
 import { restaurarBackup } from '../db/restaurarBackup';
 import { mensagemDeErro } from '../utils/mensagemDeErro';
@@ -28,6 +29,8 @@ export default function BackupScreen() {
   const carregarSimulacoes = useSimulacoesStore((state) => state.carregar);
   const saldosIniciais = useSaldoInicialStore((state) => state.saldosIniciais);
   const carregarSaldoInicial = useSaldoInicialStore((state) => state.carregar);
+  const metasReserva = useMetaReservaStore((state) => state.metas);
+  const carregarMetasReserva = useMetaReservaStore((state) => state.carregar);
 
   const [mensagem, setMensagem] = useState<string | null>(null);
   const [exportando, setExportando] = useState(false);
@@ -45,7 +48,14 @@ export default function BackupScreen() {
     carregarTransacoes();
     carregarSimulacoes();
     carregarSaldoInicial();
-  }, [carregarCategorias, carregarTransacoes, carregarSimulacoes, carregarSaldoInicial]);
+    carregarMetasReserva();
+  }, [
+    carregarCategorias,
+    carregarTransacoes,
+    carregarSimulacoes,
+    carregarSaldoInicial,
+    carregarMetasReserva,
+  ]);
 
   async function exportar() {
     setMensagem(null);
@@ -60,6 +70,7 @@ export default function BackupScreen() {
         carregarTransacoes(),
         carregarSimulacoes(),
         carregarSaldoInicial(),
+        carregarMetasReserva(),
       ]);
 
       const backup = montarBackup({
@@ -67,6 +78,7 @@ export default function BackupScreen() {
         transacoes: useTransacoesStore.getState().transacoes,
         simulacoes: useSimulacoesStore.getState().simulacoes,
         saldosIniciais: useSaldoInicialStore.getState().saldosIniciais,
+        metasReserva: useMetaReservaStore.getState().metas,
       });
 
       // Paths.cache (não Paths.document): esse arquivo só existe pra ser
@@ -137,6 +149,7 @@ export default function BackupScreen() {
         carregarTransacoes(),
         carregarSimulacoes(),
         carregarSaldoInicial(),
+        carregarMetasReserva(),
       ]);
       setMensagem('Backup restaurado com sucesso.');
     } catch (erro) {
@@ -160,6 +173,7 @@ export default function BackupScreen() {
         <Text style={styles.resumoTexto}>{transacoes.length} transações</Text>
         <Text style={styles.resumoTexto}>{simulacoes.length} simulações</Text>
         <Text style={styles.resumoTexto}>{saldosIniciais.length} atualizações de saldo</Text>
+        <Text style={styles.resumoTexto}>{metasReserva.length} decisões sobre reserva de emergência</Text>
       </View>
 
       <Pressable

@@ -60,3 +60,13 @@ export const saldosIniciais = sqliteTable('saldos_iniciais', {
   valor: real('valor').notNull(),
   criadoEm: text('criado_em').notNull(),
 });
+
+// Mesmo padrão insert-only de saldosIniciais. `integer('ativa', { mode:
+// 'boolean' })` é como o Drizzle guarda um boolean no SQLite — a coluna vira
+// INTEGER (0 ou 1) por baixo, mas o TypeScript continua vendo `boolean`.
+export const metasReserva = sqliteTable('metas_reserva', {
+  id: text('id').primaryKey(),
+  ativa: integer('ativa', { mode: 'boolean' }).notNull(),
+  valorAlvo: real('valor_alvo'),
+  criadoEm: text('criado_em').notNull(),
+});

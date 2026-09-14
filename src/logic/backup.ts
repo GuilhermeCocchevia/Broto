@@ -3,14 +3,20 @@
 // arquivo nem em banco aqui — só formato de dado, por isso é fácil de testar
 // isolado (ver backup.test.ts). Quem escreve/lê o arquivo de verdade e quem
 // grava no banco fica em telas/db, que dependem do dispositivo de verdade.
-import type { Categoria, Transacao, Simulacao, SaldoInicial } from '../types/models';
+import type { Categoria, Transacao, Simulacao, SaldoInicial, MetaReserva } from '../types/models';
 
 // Número da versão do FORMATO do backup (não da versão do app). Se um dia o
 // formato precisar mudar de forma incompatível (ex: renomear um campo), essa
 // versão sobe e `lerBackup` pode decidir como migrar ou recusar arquivos
 // antigos — sem isso, um backup de uma versão futura ou muito antiga do app
 // podia ser lido errado silenciosamente.
-export const VERSAO_BACKUP_ATUAL = 1;
+//
+// Subiu de 1 pra 2 quando `metasReserva` foi adicionada (tabela nova da
+// reserva de emergência) — um backup versão 1 não tem esse campo, e não dá
+// pra simplesmente assumir "array vazio" silenciosamente porque isso
+// apagaria de verdade a decisão do usuário sobre a reserva ao restaurar um
+// backup antigo. Melhor recusar e deixar claro, do que perder dado calado.
+export const VERSAO_BACKUP_ATUAL = 2;
 
 export type Backup = {
   versao: number;
@@ -22,9 +28,10 @@ export type Backup = {
   transacoes: Transacao[];
   simulacoes: Simulacao[];
   saldosIniciais: SaldoInicial[];
+  metasReserva: MetaReserva[];
 };
 
-// Monta o backup a partir do estado atual das 4 tabelas. `exportadoEm` e
+// Monta o backup a partir do estado atual das tabelas. `exportadoEm` e
 // `versao` são decididos aqui, não por quem chama — mesma ideia de
 // `criadoEm` nas stores: é sempre "agora" e "a versão atual do app", não uma
 // escolha da tela.
@@ -33,6 +40,7 @@ export function montarBackup(dados: {
   transacoes: Transacao[];
   simulacoes: Simulacao[];
   saldosIniciais: SaldoInicial[];
+  metasReserva: MetaReserva[];
 }): Backup {
   return {
     versao: VERSAO_BACKUP_ATUAL,
@@ -76,7 +84,8 @@ export function lerBackup(texto: string): ResultadoLeituraBackup {
     !Array.isArray(possivelBackup.categorias) ||
     !Array.isArray(possivelBackup.transacoes) ||
     !Array.isArray(possivelBackup.simulacoes) ||
-    !Array.isArray(possivelBackup.saldosIniciais)
+    !Array.isArray(possivelBackup.saldosIniciais) ||
+    !Array.isArray(possivelBackup.metasReserva)
   ) {
     return { sucesso: false, erro: 'Esse arquivo não é um backup válido (faltam dados esperados).' };
   }
@@ -90,6 +99,7 @@ export function lerBackup(texto: string): ResultadoLeituraBackup {
       transacoes: possivelBackup.transacoes,
       simulacoes: possivelBackup.simulacoes,
       saldosIniciais: possivelBackup.saldosIniciais,
+      metasReserva: possivelBackup.metasReserva,
     },
   };
 }

@@ -15,6 +15,13 @@
       "when": 1789331923770,
       "tag": "0001_spooky_vulcan",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789408652794,
+      "tag": "0002_known_carnage",
+      "breakpoints": true
     }
   ]
 }

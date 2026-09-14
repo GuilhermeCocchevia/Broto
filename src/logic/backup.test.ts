@@ -7,7 +7,13 @@ function criarCategoria(sobrescrever: Partial<Categoria>): Categoria {
 
 test('montarBackup inclui a versão atual e todas as tabelas passadas', () => {
   const categorias = [criarCategoria({})];
-  const backup = montarBackup({ categorias, transacoes: [], simulacoes: [], saldosIniciais: [] });
+  const backup = montarBackup({
+    categorias,
+    transacoes: [],
+    simulacoes: [],
+    saldosIniciais: [],
+    metasReserva: [],
+  });
 
   expect(backup.versao).toBe(VERSAO_BACKUP_ATUAL);
   expect(backup.categorias).toBe(categorias);
@@ -16,7 +22,13 @@ test('montarBackup inclui a versão atual e todas as tabelas passadas', () => {
 
 test('lerBackup faz o caminho de ida e volta: monta, serializa, lê de novo, dados batem', () => {
   const categorias = [criarCategoria({})];
-  const backup = montarBackup({ categorias, transacoes: [], simulacoes: [], saldosIniciais: [] });
+  const backup = montarBackup({
+    categorias,
+    transacoes: [],
+    simulacoes: [],
+    saldosIniciais: [],
+    metasReserva: [],
+  });
 
   const resultado = lerBackup(JSON.stringify(backup));
 
@@ -43,7 +55,13 @@ test('lerBackup rejeita um JSON que não tem o formato de backup', () => {
 });
 
 test('lerBackup rejeita uma versão de backup diferente da atual', () => {
-  const backup = montarBackup({ categorias: [], transacoes: [], simulacoes: [], saldosIniciais: [] });
+  const backup = montarBackup({
+    categorias: [],
+    transacoes: [],
+    simulacoes: [],
+    saldosIniciais: [],
+    metasReserva: [],
+  });
   const backupComVersaoErrada = { ...backup, versao: 999 };
 
   const resultado = lerBackup(JSON.stringify(backupComVersaoErrada));
@@ -55,7 +73,13 @@ test('lerBackup rejeita uma versão de backup diferente da atual', () => {
 });
 
 test('lerBackup rejeita um backup com uma tabela faltando', () => {
-  const backup = montarBackup({ categorias: [], transacoes: [], simulacoes: [], saldosIniciais: [] });
+  const backup = montarBackup({
+    categorias: [],
+    transacoes: [],
+    simulacoes: [],
+    saldosIniciais: [],
+    metasReserva: [],
+  });
   const { categorias, ...backupIncompleto } = backup;
 
   const resultado = lerBackup(JSON.stringify(backupIncompleto));

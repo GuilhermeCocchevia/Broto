@@ -73,3 +73,10 @@ export function calcularComprometimentoDeRendaFixa(transacoes: Transacao[], mes:
 
   return despesasFixas / entradas;
 }
+
+// Total gasto no mês, somando TODAS as despesas (não só por categoria) —
+// exportada porque src/logic/reservaDeEmergencia.ts precisa dela pra
+// calcular a despesa média mensal (quantos meses de gasto o saldo cobre).
+export function calcularTotalDespesasDoMes(transacoes: Transacao[], mes: string): number {
+  return somarEntradasESaidas(transacoes, mes).saidas;
+}
