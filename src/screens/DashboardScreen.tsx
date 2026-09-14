@@ -98,6 +98,10 @@ export default function DashboardScreen() {
         <Text style={styles.botaoSecundarioTexto}>Ver resumo</Text>
       </Pressable>
 
+      <Pressable style={styles.botaoSecundario} onPress={() => navigation.navigate('Backup')}>
+        <Text style={styles.botaoSecundarioTexto}>Backup</Text>
+      </Pressable>
+
       {carregandoTransacoes && transacoes.length === 0 ? (
         <Text style={styles.listaVazia}>Carregando...</Text>
       ) : (
