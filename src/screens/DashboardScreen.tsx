@@ -8,6 +8,7 @@ import { useTransacoesStore } from '../store/useTransacoesStore';
 import { useSaldoInicialStore } from '../store/useSaldoInicialStore';
 import { obterSaldoAtual } from '../logic/projecao';
 import { formatarReal } from '../utils/formatarReal';
+import { corDaDespesa } from '../utils/corPorValor';
 import { ItemLista } from '../components/ItemLista';
 import { useCategoriaPorId } from '../hooks/useCategoriaPorId';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -44,13 +45,32 @@ export default function DashboardScreen() {
     [transacoes],
   );
 
+  // O "espectro" de cor da despesa é relativo: precisa saber qual é a menor
+  // e a maior despesa que existem pra saber onde cada uma cai entre amarelo
+  // e vermelho. Calculado uma vez só e reaproveitado pra cada item da lista,
+  // em vez de cada `ItemLista` descobrir isso sozinho.
+  const { despesaMinima, despesaMaxima } = useMemo(() => {
+    const valoresDeDespesa = transacoes
+      .filter((transacao) => transacao.tipo === 'despesa')
+      .map((transacao) => transacao.valor);
+
+    if (valoresDeDespesa.length === 0) {
+      return { despesaMinima: 0, despesaMaxima: 0 };
+    }
+
+    return {
+      despesaMinima: Math.min(...valoresDeDespesa),
+      despesaMaxima: Math.max(...valoresDeDespesa),
+    };
+  }, [transacoes]);
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Dashboard</Text>
       <Text style={[styles.saldoAtual, saldoAtual < 0 && styles.saldoNegativo]}>
         {formatarReal(saldoAtual)}
       </Text>
-      <Text style={styles.subtitle}>é o que você tem agora.</Text>
+      <Text style={styles.subtitle}>Valor Disponível</Text>
 
       <Pressable
         style={styles.botaoSecundario}
@@ -84,9 +104,17 @@ export default function DashboardScreen() {
           renderItem={({ item }) => {
             const categoria = categoriaPorId.get(item.categoriaId);
             const sinal = item.tipo === 'receita' ? '+' : '-';
+            // Marcador por VALOR, não por categoria: receita sempre vira
+            // moeda dourada; despesa vira uma cor entre amarelo e vermelho
+            // vivo, mais perto do vermelho quanto maior o gasto comparado
+            // aos outros gastos que existem.
+            const marcador =
+              item.tipo === 'receita'
+                ? { moeda: true }
+                : { cor: corDaDespesa(item.valor, despesaMinima, despesaMaxima) };
             return (
               <ItemLista
-                cor={categoria?.cor ?? colors.textMuted}
+                {...marcador}
                 titulo={item.descricao}
                 subtitulo={`${categoria?.nome ?? 'Sem categoria'} · ${item.data}${
                   item.frequencia === 'mensal' ? ' · repete todo mês' : ''
