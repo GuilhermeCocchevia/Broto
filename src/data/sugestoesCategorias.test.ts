@@ -62,3 +62,20 @@ test('buscar "abastecimento" encontra Combustível mesmo sem a palavra no nome',
 
   expect(resultado).toContain('Combustível');
 });
+
+test('buscar "chatgpt" encontra a categoria de assinatura de IA', () => {
+  const resultado = buscar(SUGESTOES_DESPESA, 'chatgpt');
+
+  expect(resultado).toContain('Assinatura de IA');
+});
+
+test('buscar "netflix" e "spotify" encontram tipos de streaming diferentes', () => {
+  expect(buscar(SUGESTOES_DESPESA, 'netflix')).toContain('Streaming de vídeo');
+  expect(buscar(SUGESTOES_DESPESA, 'spotify')).toContain('Streaming de música');
+});
+
+test('buscar "ingles" encontra aula de idiomas', () => {
+  const resultado = buscar(SUGESTOES_DESPESA, 'ingles');
+
+  expect(resultado).toContain('Aula de idiomas');
+});

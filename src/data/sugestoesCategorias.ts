@@ -123,8 +123,44 @@ export const SUGESTOES_DESPESA: SugestaoCategoria[] = [
   { nome: 'Gás', apelidos: ['conta'] },
   { nome: 'Internet', apelidos: ['conta', 'wifi'] },
   { nome: 'Telefone', apelidos: ['conta', 'celular'] },
-  { nome: 'Streaming', apelidos: ['assinatura'] },
-  { nome: 'TV por assinatura', apelidos: ['conta', 'tv a cabo'] },
+  { nome: 'TV por assinatura', apelidos: ['conta', 'tv a cabo', 'sky', 'claro tv'] },
+
+  // Assinaturas e serviços digitais — "mundo moderno": cada uma dessas
+  // categorias cobre várias marcas/apps parecidos (o apelido é o que muda
+  // de pessoa pra pessoa, a categoria em si fica genérica).
+  {
+    nome: 'Streaming de vídeo',
+    apelidos: ['netflix', 'amazon prime', 'disney', 'hbo max', 'streaming', 'assinatura'],
+  },
+  {
+    nome: 'Streaming de música',
+    apelidos: ['spotify', 'deezer', 'apple music', 'streaming', 'assinatura', 'musica'],
+  },
+  {
+    nome: 'Assinatura de IA',
+    apelidos: [
+      'chatgpt',
+      'claude',
+      'gemini',
+      'copilot',
+      'inteligencia artificial',
+      'ia',
+      'assinatura',
+    ],
+  },
+  {
+    nome: 'Assinatura de jogos',
+    apelidos: ['xbox game pass', 'playstation plus', 'jogos', 'games', 'assinatura'],
+  },
+  {
+    nome: 'Armazenamento em nuvem',
+    apelidos: ['icloud', 'google one', 'dropbox', 'nuvem', 'assinatura'],
+  },
+  {
+    nome: 'Ferramentas e produtividade',
+    apelidos: ['microsoft 365', 'google workspace', 'notion', 'office', 'assinatura', 'software'],
+  },
+  { nome: 'Livros e audiobooks', apelidos: ['kindle', 'audible', 'assinatura', 'leitura'] },
 
   // Alimentação
   { nome: 'Supermercado', apelidos: ['mercado', 'alimentacao'] },
@@ -175,6 +211,13 @@ export const SUGESTOES_DESPESA: SugestaoCategoria[] = [
   { nome: 'Mensalidade escolar', apelidos: ['escola', 'educacao'] },
   { nome: 'Faculdade', apelidos: ['universidade', 'educacao'] },
   { nome: 'Cursos', apelidos: ['educacao', 'capacitacao'] },
+  { nome: 'Aula de idiomas', apelidos: ['ingles', 'espanhol', 'idiomas', 'educacao'] },
+  { nome: 'Aula de música', apelidos: ['instrumento', 'violao', 'piano', 'canto', 'educacao'] },
+  {
+    nome: 'Aula de esporte ou dança',
+    apelidos: ['natacao', 'luta', 'danca', 'yoga', 'lutas', 'educacao'],
+  },
+  { nome: 'Autoescola', apelidos: ['carteira de motorista', 'cnh', 'educacao'] },
   { nome: 'Material escolar', apelidos: ['educacao'] },
   { nome: 'Livros', apelidos: ['educacao', 'leitura'] },
 
