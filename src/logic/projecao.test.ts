@@ -118,6 +118,31 @@ test('calcularRendaFixaMedia devolve 0 sem nenhuma receita avulsa registrada', (
   expect(calcularRendaFixaMedia([])).toBe(0);
 });
 
+test('calcularRendaFixaMedia não deixa uma receita pontual de outra categoria distorcer a média', () => {
+  // Bug real encontrado testando com dados realistas: um freelance avulso
+  // mais recente que os salários empurrava um salário de verdade pra fora
+  // da média, mesmo sendo de uma categoria completamente diferente.
+  const transacoes = [
+    criarTransacao({ tipo: 'receita', categoriaId: 'salario', valor: 3500, data: '2026-07-05' }),
+    criarTransacao({ tipo: 'receita', categoriaId: 'salario', valor: 3500, data: '2026-08-05' }),
+    criarTransacao({ tipo: 'receita', categoriaId: 'salario', valor: 3600, data: '2026-09-05' }),
+    criarTransacao({ tipo: 'receita', categoriaId: 'freelance', valor: 500, data: '2026-09-10' }),
+  ];
+
+  expect(calcularRendaFixaMedia(transacoes)).toBe((3500 + 3500 + 3600) / 3);
+});
+
+test('calcularRendaFixaMedia desempata categorias com a mesma quantidade pela mais recente', () => {
+  const transacoes = [
+    criarTransacao({ tipo: 'receita', categoriaId: 'antiga', valor: 1000, data: '2026-01-05' }),
+    criarTransacao({ tipo: 'receita', categoriaId: 'antiga', valor: 1000, data: '2026-02-05' }),
+    criarTransacao({ tipo: 'receita', categoriaId: 'nova', valor: 2000, data: '2026-08-05' }),
+    criarTransacao({ tipo: 'receita', categoriaId: 'nova', valor: 2000, data: '2026-09-05' }),
+  ];
+
+  expect(calcularRendaFixaMedia(transacoes)).toBe(2000);
+});
+
 test('rendaFixaMensal em calcularSaldoProjetado soma como entrada em todos os meses', () => {
   const resultado = calcularSaldoProjetado([], [], '2026-01', 3, 0, 3000);
 

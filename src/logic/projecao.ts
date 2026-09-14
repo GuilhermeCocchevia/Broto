@@ -60,6 +60,13 @@ export function transacaoSeAplicaNoMes(transacao: Transacao, mes: string): boole
 // Quantos salários olhar pra trás pra calcular a renda fixa projetada.
 const QUANTIDADE_SALARIOS_PARA_MEDIA = 3;
 
+// Data mais recente dentro de um grupo de transações (assume grupo não
+// vazio) — usada só pra desempatar categorias com a mesma quantidade de
+// lançamentos, ver calcularRendaFixaMedia.
+function dataMaisRecente(grupo: Transacao[]): string {
+  return grupo.reduce((maisRecente, transacao) => (transacao.data > maisRecente ? transacao.data : maisRecente), grupo[0].data);
+}
+
 // Estima a "renda fixa mensal" a partir dos últimos salários já recebidos,
 // pra usar como projeção nos meses futuros — a ideia é a mesma de fazer uma
 // média das últimas entradas de dinheiro pra saber quanto esperar chegar por
@@ -71,22 +78,50 @@ const QUANTIDADE_SALARIOS_PARA_MEDIA = 3;
 // do governo com valor fixo, cadastrado como recorrente) não entra aqui —
 // ela já é somada à parte dentro de calcularSaldoProjetado, então somar de
 // novo aqui contaria ela duas vezes.
+//
+// Bug real encontrado testando com dados realistas: pegar simplesmente as 3
+// receitas avulsas mais recentes (de QUALQUER categoria) deixa um freelance
+// ou presente pontual "empurrar" o salário de verdade pra fora da média,
+// distorcendo a projeção. A renda FIXA é a que se repete — por isso primeiro
+// agrupamos por categoria e usamos só a categoria com mais lançamentos (a
+// mais provável de ser a renda recorrente); empate é desfeito pela categoria
+// com o lançamento mais recente.
 export function calcularRendaFixaMedia(transacoes: Transacao[]): number {
   const receitasAvulsas = transacoes.filter(
     (transacao) => transacao.tipo === 'receita' && transacao.frequencia === 'unica',
   );
 
-  // Ordena da mais recente pra mais antiga (comparação de string ISO de novo,
-  // igual explicado em formatarMes) e pega só as N últimas.
-  const maisRecentesPrimeiro = [...receitasAvulsas].sort((a, b) => (a.data < b.data ? 1 : -1));
-  const ultimosSalarios = maisRecentesPrimeiro.slice(0, QUANTIDADE_SALARIOS_PARA_MEDIA);
-
-  if (ultimosSalarios.length === 0) {
+  if (receitasAvulsas.length === 0) {
     return 0;
   }
 
-  const soma = ultimosSalarios.reduce((total, transacao) => total + transacao.valor, 0);
-  return soma / ultimosSalarios.length;
+  const porCategoria = new Map<string, Transacao[]>();
+  for (const transacao of receitasAvulsas) {
+    const grupo = porCategoria.get(transacao.categoriaId) ?? [];
+    grupo.push(transacao);
+    porCategoria.set(transacao.categoriaId, grupo);
+  }
+
+  let categoriaEscolhida: Transacao[] = [];
+  for (const grupo of porCategoria.values()) {
+    const temMaisLancamentos = grupo.length > categoriaEscolhida.length;
+    const empatouMasEhMaisRecente =
+      grupo.length === categoriaEscolhida.length &&
+      categoriaEscolhida.length > 0 &&
+      dataMaisRecente(grupo) > dataMaisRecente(categoriaEscolhida);
+
+    if (temMaisLancamentos || empatouMasEhMaisRecente) {
+      categoriaEscolhida = grupo;
+    }
+  }
+
+  // Ordena da mais recente pra mais antiga (comparação de string ISO de novo,
+  // igual explicado em formatarMes) e pega só as N últimas dessa categoria.
+  const maisRecentesPrimeiro = [...categoriaEscolhida].sort((a, b) => (a.data < b.data ? 1 : -1));
+  const ultimosRecebimentos = maisRecentesPrimeiro.slice(0, QUANTIDADE_SALARIOS_PARA_MEDIA);
+
+  const soma = ultimosRecebimentos.reduce((total, transacao) => total + transacao.valor, 0);
+  return soma / ultimosRecebimentos.length;
 }
 
 // Devolve a data 'AAAA-MM-DD' do dia `diaDoMes` dentro do mês 'AAAA-MM' — mas
