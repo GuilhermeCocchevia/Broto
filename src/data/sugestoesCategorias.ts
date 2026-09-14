@@ -111,7 +111,12 @@ export const SUGESTOES_DESPESA: SugestaoCategoria[] = [
   { nome: 'Condomínio', apelidos: ['moradia'] },
   { nome: 'Financiamento imobiliário', apelidos: ['casa propria', 'moradia'] },
   { nome: 'IPTU', apelidos: ['imposto', 'moradia'] },
-  { nome: 'Manutenção da casa', apelidos: ['moradia', 'reforma'] },
+  { nome: 'Manutenção da casa', apelidos: ['moradia', 'reforma', 'reparo', 'conserto'] },
+  { nome: 'Móveis e decoração', apelidos: ['casa', 'mobilia', 'moradia'] },
+  { nome: 'Eletrodomésticos', apelidos: ['casa', 'moradia'] },
+  { nome: 'Seguro residencial', apelidos: ['casa', 'moradia', 'seguro'] },
+  { nome: 'Diarista', apelidos: ['faxina', 'limpeza', 'domestica', 'moradia'] },
+
   // Contas
   { nome: 'Água', apelidos: ['conta'] },
   { nome: 'Luz', apelidos: ['conta', 'energia eletrica'] },
@@ -119,52 +124,100 @@ export const SUGESTOES_DESPESA: SugestaoCategoria[] = [
   { nome: 'Internet', apelidos: ['conta', 'wifi'] },
   { nome: 'Telefone', apelidos: ['conta', 'celular'] },
   { nome: 'Streaming', apelidos: ['assinatura'] },
+  { nome: 'TV por assinatura', apelidos: ['conta', 'tv a cabo'] },
+
   // Alimentação
   { nome: 'Supermercado', apelidos: ['mercado', 'alimentacao'] },
+  { nome: 'Padaria', apelidos: ['alimentacao', 'pao'] },
+  { nome: 'Açougue', apelidos: ['alimentacao', 'carne'] },
+  { nome: 'Feira', apelidos: ['alimentacao', 'hortifruti', 'frutas', 'verduras'] },
   { nome: 'Restaurante', apelidos: ['alimentacao'] },
   { nome: 'Delivery', apelidos: ['alimentacao', 'ifood'] },
-  { nome: 'Lanche', apelidos: ['alimentacao'] },
+  { nome: 'Lanche', apelidos: ['alimentacao', 'cafe'] },
+
   // Transporte
-  { nome: 'Combustível', apelidos: ['gasolina', 'alcool', 'transporte'] },
-  { nome: 'Transporte público', apelidos: ['onibus', 'metro', 'transporte'] },
+  { nome: 'Combustível', apelidos: ['gasolina', 'alcool', 'diesel', 'transporte', 'abastecimento'] },
+  { nome: 'Transporte público', apelidos: ['onibus', 'metro', 'trem', 'transporte'] },
   { nome: 'Aplicativo de transporte', apelidos: ['uber', '99', 'transporte'] },
-  { nome: 'Manutenção do carro', apelidos: ['mecanico', 'transporte'] },
-  { nome: 'Seguro do carro', apelidos: ['transporte'] },
+  {
+    nome: 'Manutenção do carro',
+    apelidos: ['mecanico', 'revisao', 'transporte', 'veiculo', 'carro'],
+  },
+  {
+    nome: 'Manutenção da moto',
+    apelidos: ['mecanico', 'revisao', 'transporte', 'veiculo', 'motocicleta', 'moto'],
+  },
+  {
+    nome: 'Manutenção da bicicleta',
+    apelidos: ['bike', 'transporte', 'veiculo', 'bicicleta'],
+  },
+  { nome: 'Seguro do carro', apelidos: ['transporte', 'veiculo', 'seguro'] },
+  { nome: 'Seguro da moto', apelidos: ['transporte', 'veiculo', 'motocicleta', 'seguro'] },
+  { nome: 'IPVA', apelidos: ['imposto', 'transporte', 'veiculo', 'carro', 'moto'] },
   { nome: 'Estacionamento', apelidos: ['transporte'] },
+  { nome: 'Pedágio', apelidos: ['transporte'] },
+  { nome: 'Multa de trânsito', apelidos: ['transporte', 'veiculo'] },
+  { nome: 'Lavagem do carro', apelidos: ['transporte', 'veiculo', 'lava rapido'] },
+
   // Saúde
-  { nome: 'Plano de saúde', apelidos: ['saude'] },
-  { nome: 'Farmácia', apelidos: ['remedio', 'saude'] },
+  { nome: 'Plano de saúde', apelidos: ['convenio medico', 'saude'] },
+  { nome: 'Farmácia', apelidos: ['remedio', 'saude', 'drogaria'] },
   { nome: 'Consulta médica', apelidos: ['medico', 'saude'] },
-  { nome: 'Academia', apelidos: ['saude', 'exercicio'] },
+  { nome: 'Exame médico', apelidos: ['saude', 'laboratorio', 'exame'] },
+  { nome: 'Dentista', apelidos: ['odontologia', 'saude'] },
+  { nome: 'Fisioterapia', apelidos: ['saude'] },
+  { nome: 'Psicólogo', apelidos: ['terapia', 'saude mental', 'saude'] },
+  { nome: 'Academia', apelidos: ['saude', 'exercicio', 'malhacao'] },
+  { nome: 'Óculos e lentes', apelidos: ['otica', 'saude'] },
+  { nome: 'Suplementos e vitaminas', apelidos: ['saude'] },
+
   // Educação
   { nome: 'Mensalidade escolar', apelidos: ['escola', 'educacao'] },
   { nome: 'Faculdade', apelidos: ['universidade', 'educacao'] },
-  { nome: 'Cursos', apelidos: ['educacao'] },
+  { nome: 'Cursos', apelidos: ['educacao', 'capacitacao'] },
   { nome: 'Material escolar', apelidos: ['educacao'] },
+  { nome: 'Livros', apelidos: ['educacao', 'leitura'] },
+
   // Lazer
   { nome: 'Cinema', apelidos: ['lazer'] },
-  { nome: 'Viagem', apelidos: ['lazer', 'ferias'] },
+  { nome: 'Viagem', apelidos: ['lazer', 'ferias', 'turismo'] },
   { nome: 'Assinaturas', apelidos: ['lazer'] },
   { nome: 'Hobbies', apelidos: ['lazer'] },
+  { nome: 'Bar e balada', apelidos: ['lazer'] },
+  { nome: 'Shows e eventos', apelidos: ['lazer', 'ingresso'] },
+
   // Compras
   { nome: 'Roupas', apelidos: ['vestuario', 'compras'] },
-  { nome: 'Eletrônicos', apelidos: ['compras'] },
+  { nome: 'Calçados', apelidos: ['vestuario', 'compras', 'sapato', 'tenis'] },
+  { nome: 'Eletrônicos', apelidos: ['compras', 'tecnologia'] },
   { nome: 'Presentes', apelidos: ['compras'] },
+  { nome: 'Papelaria', apelidos: ['compras'] },
+  { nome: 'Loja de departamento', apelidos: ['compras', 'loja'] },
+
   // Financeiro
   { nome: 'Cartão de crédito', apelidos: ['fatura'] },
   { nome: 'Empréstimo', apelidos: [] },
   { nome: 'Financiamento', apelidos: [] },
   { nome: 'Juros', apelidos: [] },
   { nome: 'Taxa bancária', apelidos: ['tarifa'] },
+  { nome: 'Seguro de vida', apelidos: ['seguro'] },
+  { nome: 'Aporte em investimentos', apelidos: ['investimentos', 'poupanca'] },
+
   // Pets
   { nome: 'Pet shop', apelidos: ['pet', 'animal'] },
   { nome: 'Veterinário', apelidos: ['pet', 'animal'] },
   { nome: 'Ração', apelidos: ['pet', 'animal'] },
+  { nome: 'Banho e tosa', apelidos: ['pet', 'animal'] },
+
   // Filhos
   { nome: 'Mesada', apelidos: ['filhos'] },
   { nome: 'Itens infantis', apelidos: ['filhos', 'fraldas'] },
+  { nome: 'Brinquedos', apelidos: ['filhos'] },
+  { nome: 'Babá ou creche', apelidos: ['filhos', 'cuidado infantil'] },
+
   // Outros
   { nome: 'Imposto de renda', apelidos: ['ir'] },
+  { nome: 'Outras taxas e impostos', apelidos: ['imposto', 'taxa'] },
   { nome: 'Doação', apelidos: [] },
   { nome: 'Imprevistos', apelidos: [] },
 ];

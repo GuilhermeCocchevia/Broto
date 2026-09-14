@@ -1,5 +1,6 @@
 import {
   SUGESTOES_RECEITA,
+  SUGESTOES_DESPESA,
   textoBuscavelDaSugestao,
   type SugestaoCategoria,
 } from './sugestoesCategorias';
@@ -37,4 +38,27 @@ test('buscar "pensao" encontra todos os tipos de pensão', () => {
   expect(resultado).toContain('Pensão alimentícia');
   expect(resultado).toContain('Pensão de militar');
   expect(resultado).toContain('Pensão por morte (INSS)');
+});
+
+test('buscar "veiculo" encontra manutenção de carro, moto e bicicleta juntas', () => {
+  const resultado = buscar(SUGESTOES_DESPESA, 'veiculo');
+
+  expect(resultado).toContain('Manutenção do carro');
+  expect(resultado).toContain('Manutenção da moto');
+  expect(resultado).toContain('Manutenção da bicicleta');
+});
+
+test('buscar "saude" encontra todos os tipos de gasto com saúde', () => {
+  const resultado = buscar(SUGESTOES_DESPESA, 'saude');
+
+  expect(resultado).toContain('Plano de saúde');
+  expect(resultado).toContain('Dentista');
+  expect(resultado).toContain('Psicólogo');
+  expect(resultado.length).toBeGreaterThan(6);
+});
+
+test('buscar "abastecimento" encontra Combustível mesmo sem a palavra no nome', () => {
+  const resultado = buscar(SUGESTOES_DESPESA, 'abastecimento');
+
+  expect(resultado).toContain('Combustível');
 });
