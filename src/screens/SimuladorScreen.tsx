@@ -8,6 +8,7 @@ import { useSimulacoesStore } from '../store/useSimulacoesStore';
 import { useSaldoInicialStore } from '../store/useSaldoInicialStore';
 import { calcularSaldoProjetado, calcularRendaFixaMedia, obterSaldoAtual, adicionarMeses } from '../logic/projecao';
 import { formatarReal } from '../utils/formatarReal';
+import { GraficoSaldo } from '../components/GraficoSaldo';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 const MESES_PRA_FRENTE = 6;
@@ -74,6 +75,8 @@ export default function SimuladorScreen() {
       >
         <Text style={styles.botaoSecundarioTexto}>+ nova simulação</Text>
       </Pressable>
+
+      <GraficoSaldo saldoAtual={saldoAtual} meses={meses} />
 
       <View style={styles.lista}>
         {meses.map((item) => (
