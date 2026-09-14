@@ -1,5 +1,5 @@
-import { calcularSaldoProjetado, calcularRendaFixaMedia } from './projecao';
-import type { Transacao, Simulacao } from '../types/models';
+import { calcularSaldoProjetado, calcularRendaFixaMedia, obterSaldoAtual } from './projecao';
+import type { Transacao, Simulacao, SaldoInicial } from '../types/models';
 
 // Helpers só pra não repetir todo campo em toda transação/simulação de teste —
 // cada teste passa só o que importa pra ele, o resto vem de um padrão razoável.
@@ -140,4 +140,18 @@ test('rendaFixaMensal não soma em cima de um mês que já tem receita real regi
   // Setembro já tinha o salário real (3000) — a renda fixa não soma de novo.
   // Outubro e novembro não têm nenhuma receita registrada, então usam a média.
   expect(resultado.map((m) => m.entradas)).toEqual([3000, 3000, 3000]);
+});
+
+test('obterSaldoAtual pega o valor da linha mais recente (nunca soma nem faz média)', () => {
+  const saldos: SaldoInicial[] = [
+    { id: '1', valor: 1000, criadoEm: '2026-08-01T10:00:00.000Z' },
+    { id: '2', valor: 2500, criadoEm: '2026-09-13T10:00:00.000Z' },
+    { id: '3', valor: 900, criadoEm: '2026-09-01T10:00:00.000Z' },
+  ];
+
+  expect(obterSaldoAtual(saldos)).toBe(2500);
+});
+
+test('obterSaldoAtual devolve 0 se o usuário nunca informou nenhum saldo', () => {
+  expect(obterSaldoAtual([])).toBe(0);
 });

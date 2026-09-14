@@ -3,7 +3,7 @@
 // nem SQLite — só recebe arrays e devolve números. Isso é de propósito: lógica
 // pura é muito mais fácil de testar (ver projecao.test.ts) do que lógica
 // misturada com tela.
-import type { Transacao, Simulacao } from '../types/models';
+import type { Transacao, Simulacao, SaldoInicial } from '../types/models';
 
 export type MesProjetado = {
   // Formato 'AAAA-MM', ex: '2026-09'.
@@ -23,7 +23,9 @@ function formatarMes(data: string): string {
 
 // Soma `quantidade` meses a um mês 'AAAA-MM', estourando o ano quando passa de
 // dezembro. Ex: adicionarMeses('2026-11', 2) -> '2027-01'.
-function adicionarMeses(mesBase: string, quantidade: number): string {
+// Exportada porque a tela do Simulador também precisa dela, pra calcular
+// "o mês que vem" a partir de hoje (ver obterSaldoAtual mais abaixo).
+export function adicionarMeses(mesBase: string, quantidade: number): string {
   const [ano, mes] = mesBase.split('-').map(Number);
   // Truque pra lidar com virada de ano: conta tudo em "meses desde o ano 0",
   // soma, e depois volta pra ano/mês separados com divisão inteira e resto.
@@ -71,6 +73,21 @@ export function calcularRendaFixaMedia(transacoes: Transacao[]): number {
 
   const soma = ultimosSalarios.reduce((total, transacao) => total + transacao.valor, 0);
   return soma / ultimosSalarios.length;
+}
+
+// Pega o saldo atual de verdade: como nunca fazemos UPDATE (só INSERT), o
+// valor "certo" é sempre o da linha com criadoEm mais recente. Se o usuário
+// nunca informou nenhum saldo, 0 é a única resposta razoável.
+export function obterSaldoAtual(saldosIniciais: SaldoInicial[]): number {
+  if (saldosIniciais.length === 0) {
+    return 0;
+  }
+
+  const maisRecente = saldosIniciais.reduce((atual, candidato) =>
+    candidato.criadoEm > atual.criadoEm ? candidato : atual,
+  );
+
+  return maisRecente.valor;
 }
 
 export function calcularSaldoProjetado(

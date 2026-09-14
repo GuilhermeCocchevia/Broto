@@ -5,56 +5,65 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors } from '../theme/colors';
 import { useTransacoesStore } from '../store/useTransacoesStore';
 import { useSimulacoesStore } from '../store/useSimulacoesStore';
-import { calcularSaldoProjetado, calcularRendaFixaMedia } from '../logic/projecao';
+import { useSaldoInicialStore } from '../store/useSaldoInicialStore';
+import { calcularSaldoProjetado, calcularRendaFixaMedia, obterSaldoAtual, adicionarMeses } from '../logic/projecao';
+import { formatarReal } from '../utils/formatarReal';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 const MESES_PRA_FRENTE = 6;
-
-// Formata dinheiro em Real. `toLocaleString` já sabe colocar "R$", separador
-// de milhar e vírgula decimal do jeito que o Brasil usa, sem precisar montar
-// a string na mão.
-function formatarReal(valor: number): string {
-  return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
 
 export default function SimuladorScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const transacoes = useTransacoesStore((state) => state.transacoes);
   const simulacoes = useSimulacoesStore((state) => state.simulacoes);
+  const saldosIniciais = useSaldoInicialStore((state) => state.saldosIniciais);
   const carregarTransacoes = useTransacoesStore((state) => state.carregar);
   const carregarSimulacoes = useSimulacoesStore((state) => state.carregar);
+  const carregarSaldoInicial = useSaldoInicialStore((state) => state.carregar);
 
   useEffect(() => {
     carregarTransacoes();
     carregarSimulacoes();
-  }, [carregarTransacoes, carregarSimulacoes]);
+    carregarSaldoInicial();
+  }, [carregarTransacoes, carregarSimulacoes, carregarSaldoInicial]);
 
   // Renda fixa projetada = média dos últimos salários avulsos já registrados
   // (ver calcularRendaFixaMedia). Sem pelo menos 1 receita avulsa cadastrada,
   // isso fica 0 — não tem como estimar renda futura sem nenhum histórico real.
   const rendaFixaMensal = useMemo(() => calcularRendaFixaMedia(transacoes), [transacoes]);
 
+  const saldoAtual = useMemo(() => obterSaldoAtual(saldosIniciais), [saldosIniciais]);
+
   // useMemo evita recalcular a projeção em todo re-render — só recalcula quando
-  // transacoes ou simulacoes realmente mudam (ex: depois de uma nova compra
-  // simulada). Ainda não existe uma tela de "saldo atual", então por enquanto
-  // a projeção parte de R$ 0 de saldo — isso muda quando o controle financeiro
-  // atual (Fase 1 do app) existir de verdade.
+  // as dependências realmente mudam (ex: depois de uma nova compra simulada).
+  //
+  // Detalhe importante: a projeção começa no MÊS QUE VEM, não no mês atual.
+  // O `saldoAtual` já reflete tudo que aconteceu até hoje (é "quanto eu tenho
+  // agora"); se a projeção também somasse as transações do mês atual em cima
+  // disso, contaria as mesmas coisas duas vezes — mesmo erro que já corrigimos
+  // com a renda fixa (ver [[Estimativa não pode se sobrepor ao dado real que a
+  // gerou]] no segundo cérebro). Por isso o mês atual fica de fora da tabela:
+  // ele já está "dentro" do saldoAtual, só o futuro precisa ser projetado.
   const meses = useMemo(() => {
     const mesAtual = new Date().toISOString().slice(0, 7);
+    const proximoMes = adicionarMeses(mesAtual, 1);
     return calcularSaldoProjetado(
       transacoes,
       simulacoes,
-      mesAtual,
+      proximoMes,
       MESES_PRA_FRENTE,
-      0,
+      saldoAtual,
       rendaFixaMensal,
     );
-  }, [transacoes, simulacoes, rendaFixaMensal]);
+  }, [transacoes, simulacoes, saldoAtual, rendaFixaMensal]);
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Simulador</Text>
-      <Text style={styles.subtitle}>Projeção de saldo pros próximos {MESES_PRA_FRENTE} meses.</Text>
+      <Text style={styles.subtitle}>
+        A partir de {formatarReal(saldoAtual)} de hoje, projeção pros próximos{' '}
+        {MESES_PRA_FRENTE} meses.
+      </Text>
       <Text style={styles.rendaFixa}>
         Renda fixa projetada: {formatarReal(rendaFixaMensal)}/mês
       </Text>

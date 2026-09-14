@@ -51,3 +51,12 @@ export const simulacoes = sqliteTable('simulacoes', {
     .references(() => categorias.id),
   criadoEm: text('criado_em').notNull(),
 });
+
+// Sem FK, sem campos extras — cada linha é só "em tal momento, eu tinha esse
+// valor". A store nunca faz UPDATE aqui, só INSERT; ler "o saldo atual" é
+// sempre pegar a linha com o criadoEm mais recente.
+export const saldosIniciais = sqliteTable('saldos_iniciais', {
+  id: text('id').primaryKey(),
+  valor: real('valor').notNull(),
+  criadoEm: text('criado_em').notNull(),
+});

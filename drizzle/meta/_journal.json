@@ -8,6 +8,13 @@
       "when": 1789311445237,
       "tag": "0000_wooden_magik",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1789331923770,
+      "tag": "0001_spooky_vulcan",
+      "breakpoints": true
     }
   ]
 }

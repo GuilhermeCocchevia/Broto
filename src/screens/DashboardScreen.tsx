@@ -1,9 +1,12 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors } from '../theme/colors';
 import { useCategoriasStore } from '../store/useCategoriasStore';
+import { useSaldoInicialStore } from '../store/useSaldoInicialStore';
+import { obterSaldoAtual } from '../logic/projecao';
+import { formatarReal } from '../utils/formatarReal';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 export default function DashboardScreen() {
@@ -16,17 +19,30 @@ export default function DashboardScreen() {
   // `categorias` muda — não quando `carregando` muda, por exemplo.
   const categorias = useCategoriasStore((state) => state.categorias);
   const carregar = useCategoriasStore((state) => state.carregar);
+  const saldosIniciais = useSaldoInicialStore((state) => state.saldosIniciais);
+  const carregarSaldoInicial = useSaldoInicialStore((state) => state.carregar);
 
   // Array vazio de dependências = roda só uma vez, quando a tela monta na tela
   // (igual componentDidMount das classes antigas do React).
   useEffect(() => {
     carregar();
-  }, [carregar]);
+    carregarSaldoInicial();
+  }, [carregar, carregarSaldoInicial]);
+
+  const saldoAtual = useMemo(() => obterSaldoAtual(saldosIniciais), [saldosIniciais]);
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Dashboard</Text>
-      <Text style={styles.subtitle}>Seu resumo financeiro vai aparecer aqui.</Text>
+      <Text style={styles.saldoAtual}>{formatarReal(saldoAtual)}</Text>
+      <Text style={styles.subtitle}>é o que você tem agora.</Text>
+
+      <Pressable
+        style={styles.botaoSecundario}
+        onPress={() => navigation.navigate('AtualizarSaldo')}
+      >
+        <Text style={styles.botaoSecundarioTexto}>Atualizar saldo</Text>
+      </Pressable>
 
       <Pressable style={styles.botao} onPress={() => navigation.navigate('NovaTransacao')}>
         <Text style={styles.botaoTexto}>+ nova transação</Text>
@@ -70,6 +86,12 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '700',
     color: colors.text,
+  },
+  saldoAtual: {
+    fontSize: 36,
+    fontWeight: '700',
+    color: colors.primaryDark,
+    marginTop: 8,
   },
   subtitle: {
     fontSize: 14,

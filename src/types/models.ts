@@ -53,3 +53,13 @@ export type Simulacao = {
   // Serve pra ordenar "simulações recentes" numa lista, por exemplo.
   criadoEm: string;
 };
+
+// "Quanto eu tenho agora?" — não é uma entidade que se edita, é um registro
+// insert-only: toda vez que o usuário atualiza o saldo, cria uma linha nova
+// com data de agora, e o app sempre usa a mais recente como "o saldo atual".
+// Mesma ideia de nunca fazer UPDATE que já usamos em todo o resto do app.
+export type SaldoInicial = {
+  id: string;
+  valor: number;
+  criadoEm: string;
+};

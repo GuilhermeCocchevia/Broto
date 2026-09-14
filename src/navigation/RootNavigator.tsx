@@ -5,6 +5,7 @@ import SimuladorScreen from '../screens/SimuladorScreen';
 import NovaTransacaoScreen from '../screens/NovaTransacaoScreen';
 import NovaCategoriaScreen from '../screens/NovaCategoriaScreen';
 import NovaSimulacaoScreen from '../screens/NovaSimulacaoScreen';
+import AtualizarSaldoScreen from '../screens/AtualizarSaldoScreen';
 
 export type RootStackParamList = {
   Dashboard: undefined;
@@ -12,6 +13,7 @@ export type RootStackParamList = {
   NovaTransacao: undefined;
   NovaCategoria: undefined;
   NovaSimulacao: undefined;
+  AtualizarSaldo: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -36,6 +38,11 @@ export default function RootNavigator() {
           name="NovaSimulacao"
           component={NovaSimulacaoScreen}
           options={{ title: 'Nova simulação' }}
+        />
+        <Stack.Screen
+          name="AtualizarSaldo"
+          component={AtualizarSaldoScreen}
+          options={{ title: 'Atualizar saldo' }}
         />
       </Stack.Navigator>
     </NavigationContainer>
