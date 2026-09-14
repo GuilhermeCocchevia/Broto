@@ -257,9 +257,17 @@ export function calcularSaldoProjetado(
     const mes = adicionarMeses(mesInicial, i);
     let entradas = 0;
     let saidas = 0;
-    // Se esse mês já tem alguma receita de verdade lançada (ex: o próprio
-    // salário que gerou a média), não faz sentido SOMAR a renda fixa em cima
-    // — ela é só uma estimativa pra preencher meses sem nenhum dado real.
+    // Se esse mês já tem uma receita AVULSA de verdade lançada (ex: o
+    // próprio salário que gerou a média), não faz sentido SOMAR a renda
+    // fixa em cima — ela é só uma estimativa pra preencher meses sem
+    // nenhum dado real. Bug real encontrado testando com dados robustos:
+    // isso estava marcado como "já tem receita" pra QUALQUER receita,
+    // inclusive 'mensal' (ex: um benefício fixo de R$300) — um benefício
+    // recorrente pequeno estava silenciando a renda fixa projetada inteira
+    // (às vezes R$3.000+) em todo mês futuro, fazendo o saldo despencar na
+    // projeção sem motivo real. Receita 'mensal' é um valor certo à parte,
+    // não uma substituta da estimativa de salário — só receita 'unica'
+    // conta como "já registrado esse mês" pra esse propósito.
     let jaTemReceitaRegistradaNesseMes = false;
 
     for (const transacao of transacoes) {
@@ -267,7 +275,9 @@ export function calcularSaldoProjetado(
 
       if (transacao.tipo === 'receita') {
         entradas += transacao.valor;
-        jaTemReceitaRegistradaNesseMes = true;
+        if (transacao.frequencia === 'unica') {
+          jaTemReceitaRegistradaNesseMes = true;
+        }
       } else {
         saidas += transacao.valor;
       }

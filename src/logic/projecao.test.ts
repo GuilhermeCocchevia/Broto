@@ -225,6 +225,27 @@ test('rendaFixaMensal não soma em cima de um mês que já tem receita real regi
   expect(resultado.map((m) => m.entradas)).toEqual([3000, 3000, 3000]);
 });
 
+test('rendaFixaMensal continua somando mesmo com uma receita recorrente (mensal) no mês', () => {
+  // Bug real encontrado testando com dados robustos: um benefício fixo
+  // recorrente (frequencia 'mensal', ex: R$300/mês) estava marcando o mês
+  // como "já tem receita registrada" e silenciando a renda fixa projetada
+  // inteira — mesmo ela sendo R$3.000+ de estimativa de salário. Receita
+  // 'mensal' é um valor certo À PARTE, não substitui a estimativa de
+  // salário avulso; só receita 'unica' deveria suprimir a renda fixa.
+  const beneficioFixo = criarTransacao({
+    tipo: 'receita',
+    frequencia: 'mensal',
+    valor: 300,
+    data: '2026-01-10',
+    dataFim: null,
+  });
+
+  const resultado = calcularSaldoProjetado([beneficioFixo], [], '2026-10', 2, 0, 3266.67);
+
+  // Cada mês: 300 do benefício + 3266,67 da renda fixa projetada.
+  expect(resultado.map((m) => Math.round(m.entradas * 100) / 100)).toEqual([3566.67, 3566.67]);
+});
+
 test('obterSaldoAtual pega o valor da linha mais recente (nunca soma nem faz média)', () => {
   const saldos: SaldoInicial[] = [
     { id: '1', valor: 1000, criadoEm: '2026-08-01T10:00:00.000Z' },
