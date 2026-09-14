@@ -8,13 +8,19 @@ import { useCategoriasStore } from '../store/useCategoriasStore';
 import { OpcaoBotao } from '../components/OpcaoBotao';
 import { mensagemDeErro } from '../utils/mensagemDeErro';
 import { normalizarTexto } from '../utils/normalizarTexto';
-import { SUGESTOES_RECEITA, SUGESTOES_DESPESA } from '../data/sugestoesCategorias';
+import {
+  SUGESTOES_RECEITA,
+  SUGESTOES_DESPESA,
+  textoBuscavelDaSugestao,
+} from '../data/sugestoesCategorias';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import type { TipoTransacao } from '../types/models';
 
 // Quantas sugestões mostrar no máximo — sem isso, digitar uma letra comum
-// (tipo "a") poderia listar a metade das sugestões de uma vez.
-const MAXIMO_SUGESTOES = 6;
+// (tipo "a") poderia listar a metade das sugestões de uma vez. 12 é
+// suficiente pra buscas amplas (ex: "benefício" tem mais de uma dezena de
+// tipos diferentes) sem virar uma lista infinita pra buscas genéricas.
+const MAXIMO_SUGESTOES = 12;
 
 // Paleta de cores fixa pra escolher a "cor da categoria" — mais simples do
 // que um seletor de cor livre (roda de cores, etc.), e garante que toda
@@ -50,15 +56,17 @@ export default function NovaCategoriaScreen() {
 
   // Sugestões filtradas pelo que já foi digitado, olhando só a lista do tipo
   // selecionado (receita ou despesa) — muda sozinho se o usuário trocar o
-  // tipo. `normalizarTexto` faz a busca ignorar acento e maiúsculo/minúsculo,
-  // então digitar "beneficio" encontra "Benefício do governo".
+  // tipo. A busca olha o nome E os apelidos de cada sugestão (ver
+  // textoBuscavelDaSugestao), então digitar "inss" encontra "Aposentadoria
+  // por invalidez" mesmo sem a palavra "INSS" aparecer no nome exibido, e
+  // digitar "beneficio" junta todos os tipos de benefício numa lista só.
   const sugestoes = useMemo(() => {
     const nomeNormalizado = normalizarTexto(nome);
     if (!nomeNormalizado) return [];
 
     const listaDoTipo = tipo === 'receita' ? SUGESTOES_RECEITA : SUGESTOES_DESPESA;
     return listaDoTipo
-      .filter((sugestao) => normalizarTexto(sugestao).includes(nomeNormalizado))
+      .filter((sugestao) => normalizarTexto(textoBuscavelDaSugestao(sugestao)).includes(nomeNormalizado))
       .slice(0, MAXIMO_SUGESTOES);
   }, [nome, tipo]);
 
@@ -149,11 +157,11 @@ export default function NovaCategoriaScreen() {
         <View style={styles.opcoes}>
           {sugestoes.map((sugestao) => (
             <OpcaoBotao
-              key={sugestao}
-              label={sugestao}
+              key={sugestao.nome}
+              label={sugestao.nome}
               selecionado={false}
               onPress={() => {
-                setNome(sugestao);
+                setNome(sugestao.nome);
                 setCampoNomeFocado(false);
               }}
             />
