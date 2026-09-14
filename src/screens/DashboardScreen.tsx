@@ -33,7 +33,10 @@ export default function DashboardScreen() {
     carregarSaldoInicial();
   }, [carregarCategorias, carregarTransacoes, carregarSaldoInicial]);
 
-  const saldoAtual = useMemo(() => obterSaldoAtual(saldosIniciais), [saldosIniciais]);
+  const saldoAtual = useMemo(
+    () => obterSaldoAtual(saldosIniciais, transacoes),
+    [saldosIniciais, transacoes],
+  );
   const categoriaPorId = useCategoriaPorId();
 
   // Extrato: mais recente primeiro. `[...transacoes]` copia o array antes de

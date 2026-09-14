@@ -40,7 +40,10 @@ export default function SimuladorScreen() {
   // isso fica 0 — não tem como estimar renda futura sem nenhum histórico real.
   const rendaFixaMensal = useMemo(() => calcularRendaFixaMedia(transacoes), [transacoes]);
 
-  const saldoAtual = useMemo(() => obterSaldoAtual(saldosIniciais), [saldosIniciais]);
+  const saldoAtual = useMemo(
+    () => obterSaldoAtual(saldosIniciais, transacoes),
+    [saldosIniciais, transacoes],
+  );
 
   // useMemo evita recalcular a projeção em todo re-render — só recalcula quando
   // as dependências realmente mudam (ex: depois de uma nova compra simulada).

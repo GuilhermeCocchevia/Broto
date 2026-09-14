@@ -155,3 +155,64 @@ test('obterSaldoAtual pega o valor da linha mais recente (nunca soma nem faz mé
 test('obterSaldoAtual devolve 0 se o usuário nunca informou nenhum saldo', () => {
   expect(obterSaldoAtual([])).toBe(0);
 });
+
+test('obterSaldoAtual soma transações únicas lançadas depois do saldo informado', () => {
+  const saldos: SaldoInicial[] = [{ id: '1', valor: 1000, criadoEm: '2026-09-10T10:00:00.000Z' }];
+  const despesaDepois = criarTransacao({ tipo: 'despesa', valor: 50, data: '2026-09-12' });
+  const receitaDepois = criarTransacao({ tipo: 'receita', valor: 200, data: '2026-09-13' });
+
+  const resultado = obterSaldoAtual(saldos, [despesaDepois, receitaDepois], '2026-09-14');
+
+  expect(resultado).toBe(1000 - 50 + 200);
+});
+
+test('obterSaldoAtual ignora transações de antes do saldo informado (já estão embutidas nele)', () => {
+  const saldos: SaldoInicial[] = [{ id: '1', valor: 1000, criadoEm: '2026-09-10T10:00:00.000Z' }];
+  const despesaAntiga = criarTransacao({ tipo: 'despesa', valor: 900, data: '2026-08-01' });
+
+  const resultado = obterSaldoAtual(saldos, [despesaAntiga], '2026-09-14');
+
+  expect(resultado).toBe(1000);
+});
+
+test('obterSaldoAtual ignora transação única com data futura (ainda não aconteceu)', () => {
+  const saldos: SaldoInicial[] = [{ id: '1', valor: 1000, criadoEm: '2026-09-10T10:00:00.000Z' }];
+  const despesaFutura = criarTransacao({ tipo: 'despesa', valor: 300, data: '2026-09-20' });
+
+  const resultado = obterSaldoAtual(saldos, [despesaFutura], '2026-09-14');
+
+  expect(resultado).toBe(1000);
+});
+
+test('obterSaldoAtual só conta a parcela mensal se o dia de cobrança já passou', () => {
+  const saldos: SaldoInicial[] = [{ id: '1', valor: 1000, criadoEm: '2026-08-01T10:00:00.000Z' }];
+  // Cobra todo dia 20 — em setembro, se hoje é dia 14, ainda não cobrou.
+  const assinatura = criarTransacao({
+    frequencia: 'mensal',
+    valor: 40,
+    data: '2026-01-20',
+    dataFim: null,
+  });
+
+  const resultado = obterSaldoAtual(saldos, [assinatura], '2026-09-14');
+
+  // fev-jul já estão embutidos no saldo informado (dia 01/08). De ago em
+  // diante: ago-20 já aconteceu (conta), mas set-20 ainda não (hoje é dia 14).
+  expect(resultado).toBe(1000 - 40 * 1);
+});
+
+test('obterSaldoAtual "gruda" a cobrança mensal no último dia de meses mais curtos', () => {
+  const saldos: SaldoInicial[] = [{ id: '1', valor: 1000, criadoEm: '2026-01-31T10:00:00.000Z' }];
+  // Dia 31 — fevereiro de 2026 (não bissexto) só tem 28 dias.
+  const assinatura = criarTransacao({
+    frequencia: 'mensal',
+    valor: 100,
+    data: '2026-01-31',
+    dataFim: null,
+  });
+
+  const resultado = obterSaldoAtual(saldos, [assinatura], '2026-02-28');
+
+  // A cobrança de fevereiro "gruda" no dia 28 (último dia do mês) — já aconteceu.
+  expect(resultado).toBe(1000 - 100);
+});

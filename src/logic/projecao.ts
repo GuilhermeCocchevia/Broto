@@ -75,10 +75,64 @@ export function calcularRendaFixaMedia(transacoes: Transacao[]): number {
   return soma / ultimosSalarios.length;
 }
 
-// Pega o saldo atual de verdade: como nunca fazemos UPDATE (só INSERT), o
-// valor "certo" é sempre o da linha com criadoEm mais recente. Se o usuário
-// nunca informou nenhum saldo, 0 é a única resposta razoável.
-export function obterSaldoAtual(saldosIniciais: SaldoInicial[]): number {
+// Devolve a data 'AAAA-MM-DD' do dia `diaDoMes` dentro do mês 'AAAA-MM' — mas
+// "grudada" no último dia do mês quando ele não tem dias suficientes (ex: dia
+// 31 num mês 'AAAA-02' vira o dia 28, ou 29 em ano bissexto). É o mesmo
+// comportamento que cobranças recorrentes de cartão costumam ter na vida real.
+function dataDoDiaNoMes(mes: string, diaDoMes: number): string {
+  const [ano, mesNumero] = mes.split('-').map(Number);
+  // new Date(ano, mesNumero, 0) devolve o dia 0 do mês seguinte — que em JS
+  // significa "o último dia do mês anterior" (aqui, o próprio `mesNumero`,
+  // já que ele é 1-indexado e o segundo argumento do Date é 0-indexado).
+  const ultimoDiaDoMes = new Date(ano, mesNumero, 0).getDate();
+  const diaClampado = Math.min(diaDoMes, ultimoDiaDoMes);
+  return `${mes}-${String(diaClampado).padStart(2, '0')}`;
+}
+
+// Quantas vezes uma transação recorrente ('mensal') já ocorreu de VERDADE,
+// contando só entre `dataReferencia` (exclusive) e `hoje` (inclusive). Difere
+// de calcularSaldoProjetado: aqui a data importa (uma assinatura que cobra no
+// dia 20 ainda não "aconteceu" se hoje é dia 14), porque isso alimenta o saldo
+// real — já a projeção trabalha em blocos de mês inteiro porque o futuro é só
+// estimativa mesmo, não teria sentido fingir precisão de dia lá.
+function contarOcorrenciasMensais(
+  transacao: Transacao,
+  dataReferencia: string,
+  hoje: string,
+): number {
+  const diaDoMes = Number(transacao.data.slice(8, 10));
+  const mesDoFim = transacao.dataFim === null ? null : formatarMes(transacao.dataFim);
+  const mesLimite = mesDoFim !== null && mesDoFim < formatarMes(hoje) ? mesDoFim : formatarMes(hoje);
+
+  let contagem = 0;
+  let mes = formatarMes(transacao.data);
+  while (mes <= mesLimite) {
+    const dataDaOcorrencia = dataDoDiaNoMes(mes, diaDoMes);
+    if (dataDaOcorrencia > dataReferencia && dataDaOcorrencia <= hoje) {
+      contagem++;
+    }
+    mes = adicionarMeses(mes, 1);
+  }
+
+  return contagem;
+}
+
+// Pega o saldo atual de VERDADE: parte do último saldo informado pelo usuário
+// (como nunca fazemos UPDATE nessa tabela, é sempre a linha com criadoEm mais
+// recente) e soma o impacto de tudo que já aconteceu DEPOIS daquele dia — sem
+// isso, lançar uma transação hoje não mudaria o saldo mostrado até o usuário
+// atualizar o saldo manualmente de novo, o que contradiz a própria ideia de
+// "saldo atual". Sem nenhum saldo informado ainda, 0 é a única resposta
+// razoável (não dá pra saber um valor absoluto só a partir de variações).
+export function obterSaldoAtual(
+  saldosIniciais: SaldoInicial[],
+  transacoes: Transacao[] = [],
+  // Injetado (em vez de calcular `new Date()` aqui dentro) pra função continuar
+  // pura e fácil de testar — mesmo raciocínio de calcularSaldoProjetado receber
+  // `mesInicial` de fora. Mesma convenção de fuso (ISO/UTC) já usada em
+  // SimuladorScreen pro "mês atual".
+  hoje: string = new Date().toISOString().slice(0, 10),
+): number {
   if (saldosIniciais.length === 0) {
     return 0;
   }
@@ -87,7 +141,24 @@ export function obterSaldoAtual(saldosIniciais: SaldoInicial[]): number {
     candidato.criadoEm > atual.criadoEm ? candidato : atual,
   );
 
-  return maisRecente.valor;
+  // O saldo informado já reflete tudo até o dia em que foi cadastrado — só
+  // contamos o impacto do que aconteceu DEPOIS dessa data, pra não somar de
+  // novo algo que o próprio valor informado já carrega embutido.
+  const dataReferencia = maisRecente.criadoEm.slice(0, 10);
+
+  const impacto = transacoes.reduce((total, transacao) => {
+    const sinal = transacao.tipo === 'receita' ? 1 : -1;
+
+    if (transacao.frequencia === 'unica') {
+      const jaAconteceu = transacao.data > dataReferencia && transacao.data <= hoje;
+      return jaAconteceu ? total + sinal * transacao.valor : total;
+    }
+
+    const ocorrencias = contarOcorrenciasMensais(transacao, dataReferencia, hoje);
+    return total + sinal * transacao.valor * ocorrencias;
+  }, 0);
+
+  return maisRecente.valor + impacto;
 }
 
 export function calcularSaldoProjetado(
