@@ -1,4 +1,10 @@
-import { calcularSaldoProjetado, calcularRendaFixaMedia, obterSaldoAtual } from './projecao';
+import {
+  calcularSaldoProjetado,
+  calcularRendaFixaMedia,
+  obterSaldoAtual,
+  calcularValorDaParcela,
+  calcularJurosTotal,
+} from './projecao';
 import type { Transacao, Simulacao, SaldoInicial } from '../types/models';
 
 // Helpers só pra não repetir todo campo em toda transação/simulação de teste —
@@ -25,6 +31,7 @@ function criarSimulacao(sobrescrever: Partial<Simulacao>): Simulacao {
     parcelas: 3,
     dataInicio: '2026-01-01',
     categoriaId: 'categoria-teste',
+    taxaJurosMensal: 0,
     criadoEm: '2026-01-01T00:00:00.000Z',
     ...sobrescrever,
   };
@@ -73,6 +80,57 @@ test('simulação parcelada só aparece durante o número de parcelas, a partir 
 
   // jan (antes de começar) = 0, fev/mar/abr = 100 cada (3 parcelas), mai = 0.
   expect(resultado.map((m) => m.saidas)).toEqual([0, 100, 100, 100, 0]);
+});
+
+test('calcularValorDaParcela sem juros é a divisão simples de sempre', () => {
+  expect(calcularValorDaParcela(300, 3, 0)).toBe(100);
+});
+
+test('calcularValorDaParcela com 1 parcela é só o valor mais 1 mês de juros', () => {
+  // Financiar por 1 mês só: a parcela cobre o principal + os juros desse
+  // único mês — é o caso mais simples de conferir de cabeça.
+  expect(calcularValorDaParcela(1000, 1, 0.1)).toBeCloseTo(1100);
+});
+
+test('calcularValorDaParcela: soma dos valores presentes das parcelas bate com o valor financiado', () => {
+  // Checagem independente da fórmula usada na implementação: por definição
+  // de amortização por parcelas fixas, trazer cada parcela a valor presente
+  // (descontando os juros mês a mês) e somar tem que devolver exatamente o
+  // valor financiado — é a definição econômica de "financiamento justo",
+  // não só reescrever a mesma fórmula da função e comparar com ela mesma.
+  const valorTotal = 1000;
+  const parcelas = 6;
+  const taxaJurosMensal = 0.03;
+  const parcela = calcularValorDaParcela(valorTotal, parcelas, taxaJurosMensal);
+
+  let somaValorPresente = 0;
+  for (let mes = 1; mes <= parcelas; mes++) {
+    somaValorPresente += parcela / Math.pow(1 + taxaJurosMensal, mes);
+  }
+
+  expect(somaValorPresente).toBeCloseTo(valorTotal, 6);
+});
+
+test('calcularJurosTotal é 0 sem taxa de juros', () => {
+  expect(calcularJurosTotal(1000, 10, 0)).toBe(0);
+});
+
+test('calcularJurosTotal é positivo e cresce com a taxa de juros', () => {
+  const jurosBaixo = calcularJurosTotal(1000, 10, 0.01);
+  const jurosAlto = calcularJurosTotal(1000, 10, 0.05);
+
+  expect(jurosBaixo).toBeGreaterThan(0);
+  expect(jurosAlto).toBeGreaterThan(jurosBaixo);
+});
+
+test('simulação com juros aumenta as saídas projetadas em relação a sem juros', () => {
+  const semJuros = criarSimulacao({ valorTotal: 1200, parcelas: 12, taxaJurosMensal: 0, dataInicio: '2026-01-01' });
+  const comJuros = criarSimulacao({ valorTotal: 1200, parcelas: 12, taxaJurosMensal: 0.03, dataInicio: '2026-01-01' });
+
+  const resultadoSemJuros = calcularSaldoProjetado([], [semJuros], '2026-01', 1);
+  const resultadoComJuros = calcularSaldoProjetado([], [comJuros], '2026-01', 1);
+
+  expect(resultadoComJuros[0].saidas).toBeGreaterThan(resultadoSemJuros[0].saidas);
 });
 
 test('saldo acumulado combina saldo inicial, transações e simulações mês a mês', () => {

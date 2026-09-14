@@ -1,0 +1,1 @@
+ALTER TABLE `simulacoes` ADD `taxa_juros_mensal` real DEFAULT 0 NOT NULL;

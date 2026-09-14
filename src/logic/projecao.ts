@@ -210,6 +210,35 @@ export function obterSaldoAtual(
   return maisRecente.valor + impacto;
 }
 
+// Valor de cada parcela de uma compra simulada, com ou sem juros. Sem juros
+// (taxa 0) é só dividir igual — mesma conta de sempre. Com juros, usa a
+// fórmula de amortização por parcelas fixas (Tabela Price, o método padrão
+// de parcelamento de cartão de crédito no Brasil): a parcela é sempre o
+// mesmo valor todo mês, mas o total pago acaba sendo maior que valorTotal —
+// a diferença é o juros. `taxaJurosMensal` é uma fração (0.02 = 2% ao mês),
+// não porcentagem inteira.
+export function calcularValorDaParcela(
+  valorTotal: number,
+  parcelas: number,
+  taxaJurosMensal: number,
+): number {
+  if (taxaJurosMensal === 0) {
+    return valorTotal / parcelas;
+  }
+
+  // Fórmula de amortização: parcela = valorTotal * (i * (1+i)^n) / ((1+i)^n - 1).
+  const fatorDeJuros = Math.pow(1 + taxaJurosMensal, parcelas);
+  return (valorTotal * taxaJurosMensal * fatorDeJuros) / (fatorDeJuros - 1);
+}
+
+// Quanto de juros a mais o parcelamento custa no total, comparado a pagar
+// valorTotal à vista — o número que mais importa pro usuário DECIDIR se vale
+// a pena parcelar com juros ou não.
+export function calcularJurosTotal(valorTotal: number, parcelas: number, taxaJurosMensal: number): number {
+  const totalPago = calcularValorDaParcela(valorTotal, parcelas, taxaJurosMensal) * parcelas;
+  return totalPago - valorTotal;
+}
+
 export function calcularSaldoProjetado(
   transacoes: Transacao[],
   simulacoes: Simulacao[],
@@ -255,11 +284,12 @@ export function calcularSaldoProjetado(
         numeroDaParcelaNesseMes >= 0 && numeroDaParcelaNesseMes < simulacao.parcelas;
 
       if (aindaTemParcelaNesseMes) {
-        // Simplificação: divide igual entre as parcelas. Num app financeiro
-        // "de verdade" a última parcela costuma absorver a diferença de
-        // arredondamento (ex: R$100 em 3x vira 33,34 + 33,33 + 33,33), mas
-        // isso fica pra depois — não é o que estamos resolvendo agora.
-        saidas += simulacao.valorTotal / simulacao.parcelas;
+        // Simplificação que ainda fica de fora: a última parcela costuma
+        // absorver a diferença de arredondamento num parcelamento de
+        // verdade (ex: R$100 em 3x vira 33,34 + 33,33 + 33,33) — aqui todas
+        // as parcelas têm exatamente o mesmo valor. Diferença de centavos,
+        // não afeta a decisão que a projeção existe pra ajudar a tomar.
+        saidas += calcularValorDaParcela(simulacao.valorTotal, simulacao.parcelas, simulacao.taxaJurosMensal);
       }
     }
 

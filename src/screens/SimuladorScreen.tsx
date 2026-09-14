@@ -7,7 +7,13 @@ import { useCategoriasStore } from '../store/useCategoriasStore';
 import { useTransacoesStore } from '../store/useTransacoesStore';
 import { useSimulacoesStore } from '../store/useSimulacoesStore';
 import { useSaldoInicialStore } from '../store/useSaldoInicialStore';
-import { calcularSaldoProjetado, calcularRendaFixaMedia, obterSaldoAtual, adicionarMeses } from '../logic/projecao';
+import {
+  calcularSaldoProjetado,
+  calcularRendaFixaMedia,
+  obterSaldoAtual,
+  adicionarMeses,
+  calcularValorDaParcela,
+} from '../logic/projecao';
 import { formatarReal } from '../utils/formatarReal';
 import { GraficoSaldo } from '../components/GraficoSaldo';
 import { ItemLista } from '../components/ItemLista';
@@ -111,12 +117,20 @@ export default function SimuladorScreen() {
         )}
         {simulacoes.map((simulacao) => {
           const categoria = categoriaPorId.get(simulacao.categoriaId);
+          // Mostra o valor REAL de cada parcela (já com juros embutidos, se
+          // houver) — antes mostrava só o valor total da compra, que não
+          // deixava claro o efeito do juros mês a mês.
+          const valorDaParcela = calcularValorDaParcela(
+            simulacao.valorTotal,
+            simulacao.parcelas,
+            simulacao.taxaJurosMensal,
+          );
           return (
             <ItemLista
               key={simulacao.id}
               cor={categoria?.cor ?? colors.textMuted}
               titulo={simulacao.descricao}
-              subtitulo={`${simulacao.parcelas}x a partir de ${simulacao.dataInicio}`}
+              subtitulo={`${simulacao.parcelas}x de ${formatarReal(valorDaParcela)} a partir de ${simulacao.dataInicio}`}
               valorTexto={formatarReal(simulacao.valorTotal)}
               onPress={() => navigation.navigate('NovaSimulacao', { id: simulacao.id })}
             />

@@ -49,6 +49,11 @@ export const simulacoes = sqliteTable('simulacoes', {
   categoriaId: text('categoria_id')
     .notNull()
     .references(() => categorias.id),
+  // `.default(0)` faz duas coisas: em INSERTs novos que não passarem esse
+  // campo, vira 0 sozinho; e na migration que ADICIONA essa coluna numa
+  // tabela que já existe, toda simulação antiga também vira 0 (sem juros) —
+  // preserva o comportamento de antes desse campo existir.
+  taxaJurosMensal: real('taxa_juros_mensal').notNull().default(0),
   criadoEm: text('criado_em').notNull(),
 });
 

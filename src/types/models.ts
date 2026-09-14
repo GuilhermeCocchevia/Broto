@@ -49,6 +49,12 @@ export type Simulacao = {
   // nos meses seguintes.
   dataInicio: string;
   categoriaId: string;
+  // Taxa de juros AO MÊS, como fração (0.02 = 2% ao mês) — não em porcentagem
+  // inteira, pra usar direto na fórmula de juros compostos sem converter toda
+  // vez. 0 = sem juros (parcelamento "normal", divide igual — era o único
+  // comportamento que existia antes desse campo existir; qualquer simulação
+  // antiga no banco recebe 0 automaticamente, ver migration).
+  taxaJurosMensal: number;
   // Quando a simulação foi criada (não confundir com dataInicio da compra em si).
   // Serve pra ordenar "simulações recentes" numa lista, por exemplo.
   criadoEm: string;

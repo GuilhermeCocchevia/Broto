@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -11,6 +11,8 @@ import { parsearValorMonetario } from '../utils/parsearValorMonetario';
 import { validarData } from '../utils/validarData';
 import { mensagemDeErro } from '../utils/mensagemDeErro';
 import { escolherCorAutomatica, encontrarCategoriaPorNome } from '../utils/resolverOuCriarCategoria';
+import { calcularValorDaParcela, calcularJurosTotal } from '../logic/projecao';
+import { formatarReal } from '../utils/formatarReal';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 // Uma simulação é sempre uma compra hipotética — não existe "simulação de
@@ -35,6 +37,10 @@ export default function NovaSimulacaoScreen() {
   const [descricao, setDescricao] = useState('');
   const [valorTotalTexto, setValorTotalTexto] = useState('');
   const [parcelasTexto, setParcelasTexto] = useState('1');
+  // Digitado como PORCENTAGEM (ex: "2,5" = 2,5% ao mês) — mais natural de
+  // digitar do que a fração (0,025) que é como fica guardado de verdade.
+  // Vazio = sem juros, mesmo comportamento de quando esse campo não existia.
+  const [taxaJurosTexto, setTaxaJurosTexto] = useState('');
   const [dataInicio, setDataInicio] = useState(new Date().toISOString().slice(0, 10));
   const [categoriaTexto, setCategoriaTexto] = useState('');
   const [erro, setErro] = useState<string | null>(null);
@@ -51,6 +57,10 @@ export default function NovaSimulacaoScreen() {
       setDescricao(simulacao.descricao);
       setValorTotalTexto(String(simulacao.valorTotal));
       setParcelasTexto(String(simulacao.parcelas));
+      // Volta de fração pra porcentagem (0,025 -> "2.5"), o inverso do que
+      // salvar() faz. "0" vira campo vazio — mais limpo que mostrar "0" pra
+      // uma simulação sem juros.
+      setTaxaJurosTexto(simulacao.taxaJurosMensal > 0 ? String(simulacao.taxaJurosMensal * 100) : '');
       setDataInicio(simulacao.dataInicio);
       const categoriaAtual = categorias.find((c) => c.id === simulacao.categoriaId);
       setCategoriaTexto(categoriaAtual?.nome ?? '');
@@ -77,6 +87,14 @@ export default function NovaSimulacaoScreen() {
       setErro('Número de parcelas precisa ser um número inteiro maior que zero.');
       return;
     }
+    // Vazio é válido (= sem juros) — só valida o formato se o usuário
+    // digitou alguma coisa. `parsearValorMonetario` serve bem aqui também:
+    // é só "texto brasileiro de número" -> number, não é específico de R$.
+    const taxaJurosPorcentagem = taxaJurosTexto.trim() ? parsearValorMonetario(taxaJurosTexto) : 0;
+    if (taxaJurosPorcentagem === null || taxaJurosPorcentagem < 0) {
+      setErro('Taxa de juros inválida. Use um número maior ou igual a 0, ou deixe em branco.');
+      return;
+    }
     if (!validarData(dataInicio)) {
       setErro('Data inválida. Use o formato AAAA-MM-DD, ex: 2026-09-14.');
       return;
@@ -98,7 +116,16 @@ export default function NovaSimulacaoScreen() {
             cor: escolherCorAutomatica(categorias.length),
           });
 
-      const dados = { descricao: descricao.trim(), valorTotal, parcelas, dataInicio, categoriaId };
+      const dados = {
+        descricao: descricao.trim(),
+        valorTotal,
+        parcelas,
+        dataInicio,
+        categoriaId,
+        // Porcentagem -> fração (2.5 -> 0.025), o formato que o resto do
+        // app (calcularValorDaParcela, calcularSaldoProjetado) espera.
+        taxaJurosMensal: taxaJurosPorcentagem / 100,
+      };
       if (idEditando) {
         await atualizar(idEditando, dados);
       } else {
@@ -129,6 +156,24 @@ export default function NovaSimulacaoScreen() {
     }
   }
 
+  // Prévia ao vivo: recalcula a cada letra digitada, pra mostrar o custo
+  // real do parcelamento ANTES do usuário confirmar — é o dado mais
+  // importante pra decidir se vale a pena parcelar com juros ou não.
+  // `|| 0` em cada leitura evita mostrar "NaN" enquanto o campo ainda não é
+  // um número válido (ex: campo vazio ou só "-"), sem precisar duplicar a
+  // validação de salvar() aqui.
+  const preview = useMemo(() => {
+    const valorTotal = parsearValorMonetario(valorTotalTexto) ?? 0;
+    const parcelas = Number(parcelasTexto) || 0;
+    const taxaJurosPorcentagem = taxaJurosTexto.trim() ? (parsearValorMonetario(taxaJurosTexto) ?? 0) : 0;
+    if (valorTotal <= 0 || parcelas <= 0) return null;
+
+    const taxaJurosMensal = taxaJurosPorcentagem / 100;
+    const valorDaParcela = calcularValorDaParcela(valorTotal, parcelas, taxaJurosMensal);
+    const jurosTotal = calcularJurosTotal(valorTotal, parcelas, taxaJurosMensal);
+    return { valorDaParcela, jurosTotal };
+  }, [valorTotalTexto, parcelasTexto, taxaJurosTexto]);
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.conteudo}>
       <Text style={styles.rotulo}>Descrição</Text>
@@ -156,6 +201,28 @@ export default function NovaSimulacaoScreen() {
         placeholder="Ex: 10"
         keyboardType="number-pad"
       />
+
+      <Text style={styles.rotulo}>Taxa de juros ao mês, em % (opcional)</Text>
+      <TextInput
+        style={styles.input}
+        value={taxaJurosTexto}
+        onChangeText={setTaxaJurosTexto}
+        placeholder="Deixe em branco pra parcelamento sem juros"
+        keyboardType="decimal-pad"
+      />
+
+      {preview && (
+        <View style={styles.preview}>
+          <Text style={styles.previewLinha}>
+            {parcelasTexto}x de {formatarReal(preview.valorDaParcela)}
+          </Text>
+          {preview.jurosTotal > 0 && (
+            <Text style={styles.previewJuros}>
+              + {formatarReal(preview.jurosTotal)} de juros no total
+            </Text>
+          )}
+        </View>
+      )}
 
       <Text style={styles.rotulo}>Data da 1ª parcela</Text>
       <TextInput
@@ -216,6 +283,22 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 16,
     color: colors.text,
+  },
+  preview: {
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: colors.surface,
+    gap: 2,
+  },
+  previewLinha: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  previewJuros: {
+    fontSize: 12,
+    color: colors.danger,
   },
   erro: {
     color: colors.danger,
