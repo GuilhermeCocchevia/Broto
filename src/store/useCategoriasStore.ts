@@ -3,6 +3,7 @@
 // pra ler o estado ou disparar as ações — sem precisar passar props de tela em tela.
 import { create } from 'zustand';
 import { randomUUID } from 'expo-crypto';
+import { eq } from 'drizzle-orm';
 import { db } from '../db/client';
 import { categorias } from '../db/schema';
 import type { Categoria } from '../types/models';
@@ -14,6 +15,8 @@ type CategoriasState = {
   carregando: boolean;
   carregar: () => Promise<void>;
   adicionar: (nova: NovaCategoria) => Promise<void>;
+  atualizar: (id: string, dados: NovaCategoria) => Promise<void>;
+  remover: (id: string) => Promise<void>;
 };
 
 // `create<CategoriasState>()` recebe uma função que devolve o estado inicial + as
@@ -39,6 +42,21 @@ export const useCategoriasStore = create<CategoriasState>()((set, get) => ({
     await db.insert(categorias).values({ id, ...nova });
     // Depois de inserir, recarrega a lista do banco — assim a tela sempre mostra
     // o que está salvo de verdade, não uma cópia otimista que pode divergir.
+    await get().carregar();
+  },
+
+  atualizar: async (id, dados) => {
+    // `.where(eq(categorias.id, id))` é o WHERE id = ? — sem isso o UPDATE
+    // mudaria a coluna em TODAS as linhas da tabela, não só nessa categoria.
+    await db.update(categorias).set(dados).where(eq(categorias.id, id));
+    await get().carregar();
+  },
+
+  remover: async (id) => {
+    // Se alguma transação/simulação ainda referenciar essa categoria, o
+    // PRAGMA foreign_keys barra esse DELETE (erro "FOREIGN KEY constraint
+    // failed") — a tela precisa tratar esse erro, não é bug daqui.
+    await db.delete(categorias).where(eq(categorias.id, id));
     await get().carregar();
   },
 }));

@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useEffect, useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RouteProp } from '@react-navigation/native';
 import { colors } from '../theme/colors';
 import { useCategoriasStore } from '../store/useCategoriasStore';
 import { OpcaoBotao } from '../components/OpcaoBotao';
@@ -23,12 +24,37 @@ const CORES_DISPONIVEIS = [
 
 export default function NovaCategoriaScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const route = useRoute<RouteProp<RootStackParamList, 'NovaCategoria'>>();
+  const idEditando = route.params?.id;
+
+  const categorias = useCategoriasStore((state) => state.categorias);
   const adicionar = useCategoriasStore((state) => state.adicionar);
+  const atualizar = useCategoriasStore((state) => state.atualizar);
+  const remover = useCategoriasStore((state) => state.remover);
 
   const [nome, setNome] = useState('');
   const [tipo, setTipo] = useState<TipoTransacao>('despesa');
   const [cor, setCor] = useState(CORES_DISPONIVEIS[0]);
   const [erro, setErro] = useState<string | null>(null);
+
+  // Muda o título no cabeçalho pra deixar claro se é edição ou criação —
+  // `navigation.setOptions` é como você muda as opções da própria tela (título,
+  // botões do header, etc.) depois que ela já montou, sem precisar de uma prop.
+  useEffect(() => {
+    navigation.setOptions({ title: idEditando ? 'Editar categoria' : 'Nova categoria' });
+  }, [navigation, idEditando]);
+
+  // Se veio um `id` pela navegação, é edição: preenche o formulário com os
+  // dados que já existem, em vez de começar em branco.
+  useEffect(() => {
+    if (!idEditando) return;
+    const categoria = categorias.find((c) => c.id === idEditando);
+    if (categoria) {
+      setNome(categoria.nome);
+      setTipo(categoria.tipo);
+      setCor(categoria.cor);
+    }
+  }, [idEditando, categorias]);
 
   // async pra poder usar `await`: só volta pra tela anterior DEPOIS de confirmar
   // que gravou de verdade no banco. Sem isso, se o `adicionar` falhar (ex: sem
@@ -43,10 +69,34 @@ export default function NovaCategoriaScreen() {
 
     setErro(null);
     try {
-      await adicionar({ nome: nome.trim(), tipo, cor });
+      if (idEditando) {
+        await atualizar(idEditando, { nome: nome.trim(), tipo, cor });
+      } else {
+        await adicionar({ nome: nome.trim(), tipo, cor });
+      }
       navigation.goBack();
     } catch (erroAoSalvar) {
       setErro(`Não consegui salvar: ${String(erroAoSalvar)}`);
+    }
+  }
+
+  function confirmarExclusao() {
+    Alert.alert('Excluir categoria', 'Essa ação não pode ser desfeita.', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Excluir', style: 'destructive', onPress: excluir },
+    ]);
+  }
+
+  async function excluir() {
+    if (!idEditando) return;
+    try {
+      await remover(idEditando);
+      navigation.goBack();
+    } catch {
+      // O erro mais provável aqui é a foreign key: existe transação ou
+      // simulação usando essa categoria, e o SQLite recusa apagar (ver
+      // PRAGMA foreign_keys em src/db/client.ts).
+      setErro('Não consegui excluir: existem transações ou simulações usando essa categoria.');
     }
   }
 
@@ -84,8 +134,14 @@ export default function NovaCategoriaScreen() {
       {erro && <Text style={styles.erro}>{erro}</Text>}
 
       <Pressable style={styles.botaoSalvar} onPress={salvar}>
-        <Text style={styles.botaoSalvarTexto}>Salvar</Text>
+        <Text style={styles.botaoSalvarTexto}>{idEditando ? 'Salvar alterações' : 'Salvar'}</Text>
       </Pressable>
+
+      {idEditando && (
+        <Pressable style={styles.botaoExcluir} onPress={confirmarExclusao}>
+          <Text style={styles.botaoExcluirTexto}>Excluir categoria</Text>
+        </Pressable>
+      )}
     </ScrollView>
   );
 }
@@ -141,6 +197,19 @@ const styles = StyleSheet.create({
   },
   botaoSalvarTexto: {
     color: colors.surface,
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  botaoExcluir: {
+    marginTop: 12,
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.danger,
+  },
+  botaoExcluirTexto: {
+    color: colors.danger,
     fontWeight: '700',
     fontSize: 16,
   },

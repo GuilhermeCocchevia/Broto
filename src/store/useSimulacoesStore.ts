@@ -1,6 +1,7 @@
 // Mesmo padrão de useCategoriasStore.ts, agora para simulações de compra futura.
 import { create } from 'zustand';
 import { randomUUID } from 'expo-crypto';
+import { eq } from 'drizzle-orm';
 import { db } from '../db/client';
 import { simulacoes } from '../db/schema';
 import type { Simulacao } from '../types/models';
@@ -12,6 +13,8 @@ type SimulacoesState = {
   carregando: boolean;
   carregar: () => Promise<void>;
   adicionar: (nova: NovaSimulacao) => Promise<void>;
+  atualizar: (id: string, dados: NovaSimulacao) => Promise<void>;
+  remover: (id: string) => Promise<void>;
 };
 
 export const useSimulacoesStore = create<SimulacoesState>()((set, get) => ({
@@ -32,6 +35,16 @@ export const useSimulacoesStore = create<SimulacoesState>()((set, get) => ({
     // string (mesma ideia do campo `data` em Transacao).
     const criadoEm = new Date().toISOString();
     await db.insert(simulacoes).values({ id, criadoEm, ...nova });
+    await get().carregar();
+  },
+
+  atualizar: async (id, dados) => {
+    await db.update(simulacoes).set(dados).where(eq(simulacoes.id, id));
+    await get().carregar();
+  },
+
+  remover: async (id) => {
+    await db.delete(simulacoes).where(eq(simulacoes.id, id));
     await get().carregar();
   },
 }));

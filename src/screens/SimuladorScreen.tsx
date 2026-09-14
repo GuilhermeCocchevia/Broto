@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors } from '../theme/colors';
@@ -58,7 +58,7 @@ export default function SimuladorScreen() {
   }, [transacoes, simulacoes, saldoAtual, rendaFixaMensal]);
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.conteudo}>
       <Text style={styles.title}>Simulador</Text>
       <Text style={styles.subtitle}>
         A partir de {formatarReal(saldoAtual)} de hoje, projeção pros próximos{' '}
@@ -75,12 +75,9 @@ export default function SimuladorScreen() {
         <Text style={styles.botaoSecundarioTexto}>+ nova simulação</Text>
       </Pressable>
 
-      <FlatList
-        style={styles.lista}
-        data={meses}
-        keyExtractor={(item) => item.mes}
-        renderItem={({ item }) => (
-          <View style={styles.linha}>
+      <View style={styles.lista}>
+        {meses.map((item) => (
+          <View key={item.mes} style={styles.linha}>
             <Text style={styles.mes}>{item.mes}</Text>
             <View style={styles.valores}>
               <Text style={styles.entradas}>+{formatarReal(item.entradas)}</Text>
@@ -88,9 +85,31 @@ export default function SimuladorScreen() {
               <Text style={styles.saldo}>{formatarReal(item.saldo)}</Text>
             </View>
           </View>
+        ))}
+      </View>
+
+      <Text style={styles.secaoTitulo}>Minhas simulações</Text>
+      <View style={styles.lista}>
+        {simulacoes.length === 0 && (
+          <Text style={styles.listaVazia}>Nenhuma simulação criada ainda.</Text>
         )}
-      />
-    </View>
+        {simulacoes.map((simulacao) => (
+          <Pressable
+            key={simulacao.id}
+            style={styles.simulacaoItem}
+            onPress={() => navigation.navigate('NovaSimulacao', { id: simulacao.id })}
+          >
+            <View style={styles.transacaoInfo}>
+              <Text style={styles.transacaoDescricao}>{simulacao.descricao}</Text>
+              <Text style={styles.transacaoDetalhe}>
+                {simulacao.parcelas}x a partir de {simulacao.dataInicio}
+              </Text>
+            </View>
+            <Text style={styles.simulacaoValor}>{formatarReal(simulacao.valorTotal)}</Text>
+          </Pressable>
+        ))}
+      </View>
+    </ScrollView>
   );
 }
 
@@ -98,8 +117,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  conteudo: {
     alignItems: 'center',
     paddingTop: 80,
+    paddingBottom: 40,
     gap: 8,
   },
   title: {
@@ -163,5 +185,44 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 13,
     fontWeight: '700',
+  },
+  secaoTitulo: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+    marginTop: 24,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 24,
+  },
+  listaVazia: {
+    textAlign: 'center',
+    color: colors.textMuted,
+    marginTop: 12,
+  },
+  simulacaoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.surface,
+  },
+  transacaoInfo: {
+    flex: 1,
+  },
+  transacaoDescricao: {
+    fontSize: 15,
+    color: colors.text,
+    fontWeight: '600',
+  },
+  transacaoDetalhe: {
+    fontSize: 12,
+    color: colors.textMuted,
+    marginTop: 2,
+  },
+  simulacaoValor: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.text,
   },
 });

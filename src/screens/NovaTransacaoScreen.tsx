@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useEffect, useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RouteProp } from '@react-navigation/native';
 import { colors } from '../theme/colors';
 import { useCategoriasStore } from '../store/useCategoriasStore';
 import { useTransacoesStore } from '../store/useTransacoesStore';
@@ -17,8 +18,14 @@ import type { TipoTransacao, Frequencia } from '../types/models';
 // com esses ~6 campos ainda compensa fazer na mão.
 export default function NovaTransacaoScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const route = useRoute<RouteProp<RootStackParamList, 'NovaTransacao'>>();
+  const idEditando = route.params?.id;
+
   const categorias = useCategoriasStore((state) => state.categorias);
+  const transacoes = useTransacoesStore((state) => state.transacoes);
   const adicionar = useTransacoesStore((state) => state.adicionar);
+  const atualizar = useTransacoesStore((state) => state.atualizar);
+  const remover = useTransacoesStore((state) => state.remover);
 
   const [descricao, setDescricao] = useState('');
   const [valorTexto, setValorTexto] = useState('');
@@ -27,6 +34,23 @@ export default function NovaTransacaoScreen() {
   const [frequencia, setFrequencia] = useState<Frequencia>('unica');
   const [categoriaId, setCategoriaId] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+
+  useEffect(() => {
+    navigation.setOptions({ title: idEditando ? 'Editar transação' : 'Nova transação' });
+  }, [navigation, idEditando]);
+
+  useEffect(() => {
+    if (!idEditando) return;
+    const transacao = transacoes.find((t) => t.id === idEditando);
+    if (transacao) {
+      setDescricao(transacao.descricao);
+      setValorTexto(String(transacao.valor));
+      setData(transacao.data);
+      setTipo(transacao.tipo);
+      setFrequencia(transacao.frequencia);
+      setCategoriaId(transacao.categoriaId);
+    }
+  }, [idEditando, transacoes]);
 
   // async: só volta pra tela anterior depois de confirmar que gravou de
   // verdade — ver o comentário equivalente em NovaCategoriaScreen.tsx.
@@ -50,7 +74,7 @@ export default function NovaTransacaoScreen() {
 
     setErro(null);
     try {
-      await adicionar({
+      const dados = {
         descricao: descricao.trim(),
         valor,
         data,
@@ -58,10 +82,32 @@ export default function NovaTransacaoScreen() {
         categoriaId,
         frequencia,
         dataFim: null,
-      });
+      };
+      if (idEditando) {
+        await atualizar(idEditando, dados);
+      } else {
+        await adicionar(dados);
+      }
       navigation.goBack();
     } catch (erroAoSalvar) {
       setErro(`Não consegui salvar: ${String(erroAoSalvar)}`);
+    }
+  }
+
+  function confirmarExclusao() {
+    Alert.alert('Excluir transação', 'Essa ação não pode ser desfeita.', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Excluir', style: 'destructive', onPress: excluir },
+    ]);
+  }
+
+  async function excluir() {
+    if (!idEditando) return;
+    try {
+      await remover(idEditando);
+      navigation.goBack();
+    } catch (erroAoExcluir) {
+      setErro(`Não consegui excluir: ${String(erroAoExcluir)}`);
     }
   }
 
@@ -132,8 +178,14 @@ export default function NovaTransacaoScreen() {
       {erro && <Text style={styles.erro}>{erro}</Text>}
 
       <Pressable style={styles.botaoSalvar} onPress={salvar}>
-        <Text style={styles.botaoSalvarTexto}>Salvar</Text>
+        <Text style={styles.botaoSalvarTexto}>{idEditando ? 'Salvar alterações' : 'Salvar'}</Text>
       </Pressable>
+
+      {idEditando && (
+        <Pressable style={styles.botaoExcluir} onPress={confirmarExclusao}>
+          <Text style={styles.botaoExcluirTexto}>Excluir transação</Text>
+        </Pressable>
+      )}
     </ScrollView>
   );
 }
@@ -183,6 +235,19 @@ const styles = StyleSheet.create({
   },
   botaoSalvarTexto: {
     color: colors.surface,
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  botaoExcluir: {
+    marginTop: 12,
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.danger,
+  },
+  botaoExcluirTexto: {
+    color: colors.danger,
     fontWeight: '700',
     fontSize: 16,
   },

@@ -72,11 +72,8 @@ export default function DashboardScreen() {
         <Text style={styles.botaoTexto}>+ nova transação</Text>
       </Pressable>
 
-      <Pressable
-        style={styles.botaoSecundario}
-        onPress={() => navigation.navigate('NovaCategoria')}
-      >
-        <Text style={styles.botaoSecundarioTexto}>+ nova categoria</Text>
+      <Pressable style={styles.botaoSecundario} onPress={() => navigation.navigate('Categorias')}>
+        <Text style={styles.botaoSecundarioTexto}>Categorias</Text>
       </Pressable>
 
       <Pressable style={styles.botaoSecundario} onPress={() => navigation.navigate('Simulador')}>
@@ -94,7 +91,10 @@ export default function DashboardScreen() {
           const categoria = categoriaPorId.get(item.categoriaId);
           const sinal = item.tipo === 'receita' ? '+' : '-';
           return (
-            <View style={styles.transacaoItem}>
+            <Pressable
+              style={styles.transacaoItem}
+              onPress={() => navigation.navigate('NovaTransacao', { id: item.id })}
+            >
               <View
                 style={[
                   styles.transacaoCor,
@@ -112,7 +112,7 @@ export default function DashboardScreen() {
                 {sinal}
                 {formatarReal(item.valor)}
               </Text>
-            </View>
+            </Pressable>
           );
         }}
       />

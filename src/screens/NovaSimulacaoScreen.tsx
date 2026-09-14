@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useEffect, useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RouteProp } from '@react-navigation/native';
 import { colors } from '../theme/colors';
 import { useCategoriasStore } from '../store/useCategoriasStore';
 import { useSimulacoesStore } from '../store/useSimulacoesStore';
@@ -13,8 +14,14 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 // sem nunca virar uma Transacao de verdade.
 export default function NovaSimulacaoScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const route = useRoute<RouteProp<RootStackParamList, 'NovaSimulacao'>>();
+  const idEditando = route.params?.id;
+
   const categorias = useCategoriasStore((state) => state.categorias);
+  const simulacoes = useSimulacoesStore((state) => state.simulacoes);
   const adicionar = useSimulacoesStore((state) => state.adicionar);
+  const atualizar = useSimulacoesStore((state) => state.atualizar);
+  const remover = useSimulacoesStore((state) => state.remover);
 
   const [descricao, setDescricao] = useState('');
   const [valorTotalTexto, setValorTotalTexto] = useState('');
@@ -22,6 +29,22 @@ export default function NovaSimulacaoScreen() {
   const [dataInicio, setDataInicio] = useState(new Date().toISOString().slice(0, 10));
   const [categoriaId, setCategoriaId] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+
+  useEffect(() => {
+    navigation.setOptions({ title: idEditando ? 'Editar simulação' : 'Nova simulação' });
+  }, [navigation, idEditando]);
+
+  useEffect(() => {
+    if (!idEditando) return;
+    const simulacao = simulacoes.find((s) => s.id === idEditando);
+    if (simulacao) {
+      setDescricao(simulacao.descricao);
+      setValorTotalTexto(String(simulacao.valorTotal));
+      setParcelasTexto(String(simulacao.parcelas));
+      setDataInicio(simulacao.dataInicio);
+      setCategoriaId(simulacao.categoriaId);
+    }
+  }, [idEditando, simulacoes]);
 
   // async: só volta pra tela anterior depois de confirmar que gravou de
   // verdade — ver o comentário equivalente em NovaCategoriaScreen.tsx.
@@ -50,16 +73,32 @@ export default function NovaSimulacaoScreen() {
 
     setErro(null);
     try {
-      await adicionar({
-        descricao: descricao.trim(),
-        valorTotal,
-        parcelas,
-        dataInicio,
-        categoriaId,
-      });
+      const dados = { descricao: descricao.trim(), valorTotal, parcelas, dataInicio, categoriaId };
+      if (idEditando) {
+        await atualizar(idEditando, dados);
+      } else {
+        await adicionar(dados);
+      }
       navigation.goBack();
     } catch (erroAoSalvar) {
       setErro(`Não consegui salvar: ${String(erroAoSalvar)}`);
+    }
+  }
+
+  function confirmarExclusao() {
+    Alert.alert('Excluir simulação', 'Essa ação não pode ser desfeita.', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Excluir', style: 'destructive', onPress: excluir },
+    ]);
+  }
+
+  async function excluir() {
+    if (!idEditando) return;
+    try {
+      await remover(idEditando);
+      navigation.goBack();
+    } catch (erroAoExcluir) {
+      setErro(`Não consegui excluir: ${String(erroAoExcluir)}`);
     }
   }
 
@@ -119,8 +158,14 @@ export default function NovaSimulacaoScreen() {
       {erro && <Text style={styles.erro}>{erro}</Text>}
 
       <Pressable style={styles.botaoSalvar} onPress={salvar}>
-        <Text style={styles.botaoSalvarTexto}>Salvar</Text>
+        <Text style={styles.botaoSalvarTexto}>{idEditando ? 'Salvar alterações' : 'Salvar'}</Text>
       </Pressable>
+
+      {idEditando && (
+        <Pressable style={styles.botaoExcluir} onPress={confirmarExclusao}>
+          <Text style={styles.botaoExcluirTexto}>Excluir simulação</Text>
+        </Pressable>
+      )}
     </ScrollView>
   );
 }
@@ -170,6 +215,19 @@ const styles = StyleSheet.create({
   },
   botaoSalvarTexto: {
     color: colors.surface,
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  botaoExcluir: {
+    marginTop: 12,
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.danger,
+  },
+  botaoExcluirTexto: {
+    color: colors.danger,
     fontWeight: '700',
     fontSize: 16,
   },
