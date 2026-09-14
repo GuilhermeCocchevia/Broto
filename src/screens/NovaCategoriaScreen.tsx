@@ -6,6 +6,7 @@ import type { RouteProp } from '@react-navigation/native';
 import { colors } from '../theme/colors';
 import { useCategoriasStore } from '../store/useCategoriasStore';
 import { OpcaoBotao } from '../components/OpcaoBotao';
+import { mensagemDeErro } from '../utils/mensagemDeErro';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import type { TipoTransacao } from '../types/models';
 
@@ -36,6 +37,7 @@ export default function NovaCategoriaScreen() {
   const [tipo, setTipo] = useState<TipoTransacao>('despesa');
   const [cor, setCor] = useState(CORES_DISPONIVEIS[0]);
   const [erro, setErro] = useState<string | null>(null);
+  const [salvando, setSalvando] = useState(false);
 
   // Muda o título no cabeçalho pra deixar claro se é edição ou criação —
   // `navigation.setOptions` é como você muda as opções da própria tela (título,
@@ -68,6 +70,7 @@ export default function NovaCategoriaScreen() {
     }
 
     setErro(null);
+    setSalvando(true);
     try {
       if (idEditando) {
         await atualizar(idEditando, { nome: nome.trim(), tipo, cor });
@@ -76,7 +79,9 @@ export default function NovaCategoriaScreen() {
       }
       navigation.goBack();
     } catch (erroAoSalvar) {
-      setErro(`Não consegui salvar: ${String(erroAoSalvar)}`);
+      setErro(mensagemDeErro(erroAoSalvar, 'salvar'));
+    } finally {
+      setSalvando(false);
     }
   }
 
@@ -92,11 +97,8 @@ export default function NovaCategoriaScreen() {
     try {
       await remover(idEditando);
       navigation.goBack();
-    } catch {
-      // O erro mais provável aqui é a foreign key: existe transação ou
-      // simulação usando essa categoria, e o SQLite recusa apagar (ver
-      // PRAGMA foreign_keys em src/db/client.ts).
-      setErro('Não consegui excluir: existem transações ou simulações usando essa categoria.');
+    } catch (erroAoExcluir) {
+      setErro(mensagemDeErro(erroAoExcluir, 'excluir'));
     }
   }
 
@@ -133,8 +135,14 @@ export default function NovaCategoriaScreen() {
 
       {erro && <Text style={styles.erro}>{erro}</Text>}
 
-      <Pressable style={styles.botaoSalvar} onPress={salvar}>
-        <Text style={styles.botaoSalvarTexto}>{idEditando ? 'Salvar alterações' : 'Salvar'}</Text>
+      <Pressable
+        style={[styles.botaoSalvar, salvando && styles.botaoDesabilitado]}
+        onPress={salvar}
+        disabled={salvando}
+      >
+        <Text style={styles.botaoSalvarTexto}>
+          {salvando ? 'Salvando...' : idEditando ? 'Salvar alterações' : 'Salvar'}
+        </Text>
       </Pressable>
 
       {idEditando && (
@@ -199,6 +207,9 @@ const styles = StyleSheet.create({
     color: colors.surface,
     fontWeight: '700',
     fontSize: 16,
+  },
+  botaoDesabilitado: {
+    opacity: 0.6,
   },
   botaoExcluir: {
     marginTop: 12,

@@ -7,6 +7,9 @@ import { colors } from '../theme/colors';
 import { useCategoriasStore } from '../store/useCategoriasStore';
 import { useTransacoesStore } from '../store/useTransacoesStore';
 import { OpcaoBotao } from '../components/OpcaoBotao';
+import { parsearValorMonetario } from '../utils/parsearValorMonetario';
+import { validarData } from '../utils/validarData';
+import { mensagemDeErro } from '../utils/mensagemDeErro';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import type { TipoTransacao, Frequencia } from '../types/models';
 
@@ -32,8 +35,15 @@ export default function NovaTransacaoScreen() {
   const [data, setData] = useState(new Date().toISOString().slice(0, 10));
   const [tipo, setTipo] = useState<TipoTransacao>('despesa');
   const [frequencia, setFrequencia] = useState<Frequencia>('unica');
+  // Texto vazio = "repete pra sempre" (vira `null` ao salvar). Só é usado de
+  // verdade quando frequencia === 'mensal' — ver o campo mais abaixo no JSX.
+  const [dataFimTexto, setDataFimTexto] = useState('');
   const [categoriaId, setCategoriaId] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  // Impede clique duplo: enquanto uma gravação está em andamento, o botão
+  // fica desabilitado — sem isso, dois toques rápidos disparavam duas
+  // inserções antes da primeira terminar e a tela navegar de volta.
+  const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
     navigation.setOptions({ title: idEditando ? 'Editar transação' : 'Nova transação' });
@@ -48,6 +58,7 @@ export default function NovaTransacaoScreen() {
       setData(transacao.data);
       setTipo(transacao.tipo);
       setFrequencia(transacao.frequencia);
+      setDataFimTexto(transacao.dataFim ?? '');
       setCategoriaId(transacao.categoriaId);
     }
   }, [idEditando, transacoes]);
@@ -55,16 +66,25 @@ export default function NovaTransacaoScreen() {
   // async: só volta pra tela anterior depois de confirmar que gravou de
   // verdade — ver o comentário equivalente em NovaCategoriaScreen.tsx.
   async function salvar() {
-    // valorTexto vem de um TextInput, ou seja, sempre é string — Number('abc')
-    // não dá erro, devolve NaN ("Not a Number"), por isso a checagem explícita.
-    const valor = Number(valorTexto.replace(',', '.'));
+    const valor = parsearValorMonetario(valorTexto);
 
     if (!descricao.trim()) {
       setErro('Preencha a descrição.');
       return;
     }
-    if (!valorTexto || Number.isNaN(valor) || valor <= 0) {
+    if (valor === null || valor <= 0) {
       setErro('Informe um valor válido, maior que zero.');
+      return;
+    }
+    if (!validarData(data)) {
+      setErro('Data inválida. Use o formato AAAA-MM-DD, ex: 2026-09-14.');
+      return;
+    }
+    // dataFim só faz sentido pra transação mensal, e é opcional mesmo assim
+    // (vazio = repete pra sempre) — por isso só valida o formato se o
+    // usuário de fato preencheu alguma coisa.
+    if (frequencia === 'mensal' && dataFimTexto.trim() && !validarData(dataFimTexto)) {
+      setErro('Data final inválida. Use o formato AAAA-MM-DD, ou deixe em branco.');
       return;
     }
     if (!categoriaId) {
@@ -73,6 +93,7 @@ export default function NovaTransacaoScreen() {
     }
 
     setErro(null);
+    setSalvando(true);
     try {
       const dados = {
         descricao: descricao.trim(),
@@ -81,7 +102,7 @@ export default function NovaTransacaoScreen() {
         tipo,
         categoriaId,
         frequencia,
-        dataFim: null,
+        dataFim: frequencia === 'mensal' && dataFimTexto.trim() ? dataFimTexto : null,
       };
       if (idEditando) {
         await atualizar(idEditando, dados);
@@ -90,7 +111,9 @@ export default function NovaTransacaoScreen() {
       }
       navigation.goBack();
     } catch (erroAoSalvar) {
-      setErro(`Não consegui salvar: ${String(erroAoSalvar)}`);
+      setErro(mensagemDeErro(erroAoSalvar, 'salvar'));
+    } finally {
+      setSalvando(false);
     }
   }
 
@@ -107,7 +130,7 @@ export default function NovaTransacaoScreen() {
       await remover(idEditando);
       navigation.goBack();
     } catch (erroAoExcluir) {
-      setErro(`Não consegui excluir: ${String(erroAoExcluir)}`);
+      setErro(mensagemDeErro(erroAoExcluir, 'excluir'));
     }
   }
 
@@ -158,6 +181,18 @@ export default function NovaTransacaoScreen() {
         />
       </View>
 
+      {frequencia === 'mensal' && (
+        <>
+          <Text style={styles.rotulo}>Repete até quando? (opcional)</Text>
+          <TextInput
+            style={styles.input}
+            value={dataFimTexto}
+            onChangeText={setDataFimTexto}
+            placeholder="Deixe em branco pra repetir sempre"
+          />
+        </>
+      )}
+
       <Text style={styles.rotulo}>Categoria</Text>
       <View style={styles.opcoes}>
         {categorias.map((categoria) => (
@@ -177,8 +212,14 @@ export default function NovaTransacaoScreen() {
 
       {erro && <Text style={styles.erro}>{erro}</Text>}
 
-      <Pressable style={styles.botaoSalvar} onPress={salvar}>
-        <Text style={styles.botaoSalvarTexto}>{idEditando ? 'Salvar alterações' : 'Salvar'}</Text>
+      <Pressable
+        style={[styles.botaoSalvar, salvando && styles.botaoDesabilitado]}
+        onPress={salvar}
+        disabled={salvando}
+      >
+        <Text style={styles.botaoSalvarTexto}>
+          {salvando ? 'Salvando...' : idEditando ? 'Salvar alterações' : 'Salvar'}
+        </Text>
       </Pressable>
 
       {idEditando && (
@@ -237,6 +278,9 @@ const styles = StyleSheet.create({
     color: colors.surface,
     fontWeight: '700',
     fontSize: 16,
+  },
+  botaoDesabilitado: {
+    opacity: 0.6,
   },
   botaoExcluir: {
     marginTop: 12,

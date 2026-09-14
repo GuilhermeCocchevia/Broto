@@ -1,40 +1,56 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors } from '../theme/colors';
 import { useSaldoInicialStore } from '../store/useSaldoInicialStore';
+import { OpcaoBotao } from '../components/OpcaoBotao';
+import { parsearValorMonetario } from '../utils/parsearValorMonetario';
+import { mensagemDeErro } from '../utils/mensagemDeErro';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
-// Tela mais simples do app: um campo só. "Atualizar" aqui nunca sobrescreve
-// nada no banco — cria uma linha nova (ver useSaldoInicialStore), então dá
-// pra chamar essa tela quantas vezes quiser sem medo de corromper histórico.
+type Sinal = 'positivo' | 'negativo';
+
+// Tela mais simples do app: um campo de valor + o sinal. "Atualizar" aqui
+// nunca sobrescreve nada no banco — cria uma linha nova (ver
+// useSaldoInicialStore), então dá pra chamar essa tela quantas vezes quiser
+// sem medo de corromper histórico.
 export default function AtualizarSaldoScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const atualizar = useSaldoInicialStore((state) => state.atualizar);
 
   const [valorTexto, setValorTexto] = useState('');
+  // O teclado numérico do iOS não tem tecla de "-", então saldo negativo
+  // (você deve dinheiro) é escolhido aqui, não digitado — o campo de valor
+  // sempre guarda um número positivo, e a gente inverte o sinal na hora de
+  // salvar se for o caso.
+  const [sinal, setSinal] = useState<Sinal>('positivo');
   const [erro, setErro] = useState<string | null>(null);
+  const [salvando, setSalvando] = useState(false);
 
   async function salvar() {
-    const valor = Number(valorTexto.replace(',', '.'));
+    const valorAbsoluto = parsearValorMonetario(valorTexto);
 
-    if (!valorTexto || Number.isNaN(valor)) {
+    if (valorAbsoluto === null || valorAbsoluto < 0) {
       setErro('Informe um valor válido.');
       return;
     }
 
     setErro(null);
+    setSalvando(true);
     try {
+      const valor = sinal === 'negativo' ? -valorAbsoluto : valorAbsoluto;
       await atualizar(valor);
       navigation.goBack();
     } catch (erroAoSalvar) {
-      setErro(`Não consegui salvar: ${String(erroAoSalvar)}`);
+      setErro(mensagemDeErro(erroAoSalvar, 'salvar'));
+    } finally {
+      setSalvando(false);
     }
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.conteudo}>
       <Text style={styles.rotulo}>Quanto você tem agora, no total?</Text>
       <TextInput
         style={styles.input}
@@ -45,12 +61,29 @@ export default function AtualizarSaldoScreen() {
         autoFocus
       />
 
+      <View style={styles.opcoes}>
+        <OpcaoBotao
+          label="Tenho esse valor"
+          selecionado={sinal === 'positivo'}
+          onPress={() => setSinal('positivo')}
+        />
+        <OpcaoBotao
+          label="Estou devendo"
+          selecionado={sinal === 'negativo'}
+          onPress={() => setSinal('negativo')}
+        />
+      </View>
+
       {erro && <Text style={styles.erro}>{erro}</Text>}
 
-      <Pressable style={styles.botaoSalvar} onPress={salvar}>
-        <Text style={styles.botaoSalvarTexto}>Salvar</Text>
+      <Pressable
+        style={[styles.botaoSalvar, salvando && styles.botaoDesabilitado]}
+        onPress={salvar}
+        disabled={salvando}
+      >
+        <Text style={styles.botaoSalvarTexto}>{salvando ? 'Salvando...' : 'Salvar'}</Text>
       </Pressable>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -58,6 +91,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  conteudo: {
     padding: 24,
   },
   rotulo: {
@@ -74,6 +109,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.text,
   },
+  opcoes: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 16,
+  },
   erro: {
     color: colors.danger,
     marginTop: 16,
@@ -89,5 +130,8 @@ const styles = StyleSheet.create({
     color: colors.surface,
     fontWeight: '700',
     fontSize: 16,
+  },
+  botaoDesabilitado: {
+    opacity: 0.6,
   },
 });

@@ -7,6 +7,9 @@ import { colors } from '../theme/colors';
 import { useCategoriasStore } from '../store/useCategoriasStore';
 import { useSimulacoesStore } from '../store/useSimulacoesStore';
 import { OpcaoBotao } from '../components/OpcaoBotao';
+import { parsearValorMonetario } from '../utils/parsearValorMonetario';
+import { validarData } from '../utils/validarData';
+import { mensagemDeErro } from '../utils/mensagemDeErro';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 // Formulário de "e se eu comprar isso?" — cria uma Simulacao (compra
@@ -29,6 +32,7 @@ export default function NovaSimulacaoScreen() {
   const [dataInicio, setDataInicio] = useState(new Date().toISOString().slice(0, 10));
   const [categoriaId, setCategoriaId] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
     navigation.setOptions({ title: idEditando ? 'Editar simulação' : 'Nova simulação' });
@@ -49,7 +53,7 @@ export default function NovaSimulacaoScreen() {
   // async: só volta pra tela anterior depois de confirmar que gravou de
   // verdade — ver o comentário equivalente em NovaCategoriaScreen.tsx.
   async function salvar() {
-    const valorTotal = Number(valorTotalTexto.replace(',', '.'));
+    const valorTotal = parsearValorMonetario(valorTotalTexto);
     // parcelas vem de TextInput com teclado numérico, mas ainda assim é texto
     // até aqui — Number.isInteger confere que não veio algo tipo "3.5x".
     const parcelas = Number(parcelasTexto);
@@ -58,12 +62,16 @@ export default function NovaSimulacaoScreen() {
       setErro('Preencha a descrição.');
       return;
     }
-    if (!valorTotalTexto || Number.isNaN(valorTotal) || valorTotal <= 0) {
+    if (valorTotal === null || valorTotal <= 0) {
       setErro('Informe um valor total válido, maior que zero.');
       return;
     }
     if (!Number.isInteger(parcelas) || parcelas <= 0) {
       setErro('Número de parcelas precisa ser um número inteiro maior que zero.');
+      return;
+    }
+    if (!validarData(dataInicio)) {
+      setErro('Data inválida. Use o formato AAAA-MM-DD, ex: 2026-09-14.');
       return;
     }
     if (!categoriaId) {
@@ -72,6 +80,7 @@ export default function NovaSimulacaoScreen() {
     }
 
     setErro(null);
+    setSalvando(true);
     try {
       const dados = { descricao: descricao.trim(), valorTotal, parcelas, dataInicio, categoriaId };
       if (idEditando) {
@@ -81,7 +90,9 @@ export default function NovaSimulacaoScreen() {
       }
       navigation.goBack();
     } catch (erroAoSalvar) {
-      setErro(`Não consegui salvar: ${String(erroAoSalvar)}`);
+      setErro(mensagemDeErro(erroAoSalvar, 'salvar'));
+    } finally {
+      setSalvando(false);
     }
   }
 
@@ -98,7 +109,7 @@ export default function NovaSimulacaoScreen() {
       await remover(idEditando);
       navigation.goBack();
     } catch (erroAoExcluir) {
-      setErro(`Não consegui excluir: ${String(erroAoExcluir)}`);
+      setErro(mensagemDeErro(erroAoExcluir, 'excluir'));
     }
   }
 
@@ -157,8 +168,14 @@ export default function NovaSimulacaoScreen() {
 
       {erro && <Text style={styles.erro}>{erro}</Text>}
 
-      <Pressable style={styles.botaoSalvar} onPress={salvar}>
-        <Text style={styles.botaoSalvarTexto}>{idEditando ? 'Salvar alterações' : 'Salvar'}</Text>
+      <Pressable
+        style={[styles.botaoSalvar, salvando && styles.botaoDesabilitado]}
+        onPress={salvar}
+        disabled={salvando}
+      >
+        <Text style={styles.botaoSalvarTexto}>
+          {salvando ? 'Salvando...' : idEditando ? 'Salvar alterações' : 'Salvar'}
+        </Text>
       </Pressable>
 
       {idEditando && (
@@ -217,6 +234,9 @@ const styles = StyleSheet.create({
     color: colors.surface,
     fontWeight: '700',
     fontSize: 16,
+  },
+  botaoDesabilitado: {
+    opacity: 0.6,
   },
   botaoExcluir: {
     marginTop: 12,

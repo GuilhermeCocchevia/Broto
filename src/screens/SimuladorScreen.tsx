@@ -3,12 +3,15 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors } from '../theme/colors';
+import { useCategoriasStore } from '../store/useCategoriasStore';
 import { useTransacoesStore } from '../store/useTransacoesStore';
 import { useSimulacoesStore } from '../store/useSimulacoesStore';
 import { useSaldoInicialStore } from '../store/useSaldoInicialStore';
 import { calcularSaldoProjetado, calcularRendaFixaMedia, obterSaldoAtual, adicionarMeses } from '../logic/projecao';
 import { formatarReal } from '../utils/formatarReal';
 import { GraficoSaldo } from '../components/GraficoSaldo';
+import { ItemLista } from '../components/ItemLista';
+import { useCategoriaPorId } from '../hooks/useCategoriaPorId';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 const MESES_PRA_FRENTE = 6;
@@ -17,16 +20,20 @@ export default function SimuladorScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const transacoes = useTransacoesStore((state) => state.transacoes);
   const simulacoes = useSimulacoesStore((state) => state.simulacoes);
+  const carregandoSimulacoes = useSimulacoesStore((state) => state.carregando);
   const saldosIniciais = useSaldoInicialStore((state) => state.saldosIniciais);
+  const carregarCategorias = useCategoriasStore((state) => state.carregar);
   const carregarTransacoes = useTransacoesStore((state) => state.carregar);
   const carregarSimulacoes = useSimulacoesStore((state) => state.carregar);
   const carregarSaldoInicial = useSaldoInicialStore((state) => state.carregar);
+  const categoriaPorId = useCategoriaPorId();
 
   useEffect(() => {
+    carregarCategorias();
     carregarTransacoes();
     carregarSimulacoes();
     carregarSaldoInicial();
-  }, [carregarTransacoes, carregarSimulacoes, carregarSaldoInicial]);
+  }, [carregarCategorias, carregarTransacoes, carregarSimulacoes, carregarSaldoInicial]);
 
   // Renda fixa projetada = média dos últimos salários avulsos já registrados
   // (ver calcularRendaFixaMedia). Sem pelo menos 1 receita avulsa cadastrada,
@@ -93,24 +100,25 @@ export default function SimuladorScreen() {
 
       <Text style={styles.secaoTitulo}>Minhas simulações</Text>
       <View style={styles.lista}>
-        {simulacoes.length === 0 && (
+        {carregandoSimulacoes && simulacoes.length === 0 && (
+          <Text style={styles.listaVazia}>Carregando...</Text>
+        )}
+        {!carregandoSimulacoes && simulacoes.length === 0 && (
           <Text style={styles.listaVazia}>Nenhuma simulação criada ainda.</Text>
         )}
-        {simulacoes.map((simulacao) => (
-          <Pressable
-            key={simulacao.id}
-            style={styles.simulacaoItem}
-            onPress={() => navigation.navigate('NovaSimulacao', { id: simulacao.id })}
-          >
-            <View style={styles.transacaoInfo}>
-              <Text style={styles.transacaoDescricao}>{simulacao.descricao}</Text>
-              <Text style={styles.transacaoDetalhe}>
-                {simulacao.parcelas}x a partir de {simulacao.dataInicio}
-              </Text>
-            </View>
-            <Text style={styles.simulacaoValor}>{formatarReal(simulacao.valorTotal)}</Text>
-          </Pressable>
-        ))}
+        {simulacoes.map((simulacao) => {
+          const categoria = categoriaPorId.get(simulacao.categoriaId);
+          return (
+            <ItemLista
+              key={simulacao.id}
+              cor={categoria?.cor ?? colors.textMuted}
+              titulo={simulacao.descricao}
+              subtitulo={`${simulacao.parcelas}x a partir de ${simulacao.dataInicio}`}
+              valorTexto={formatarReal(simulacao.valorTotal)}
+              onPress={() => navigation.navigate('NovaSimulacao', { id: simulacao.id })}
+            />
+          );
+        })}
       </View>
     </ScrollView>
   );
@@ -201,31 +209,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: colors.textMuted,
     marginTop: 12,
-  },
-  simulacaoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.surface,
-  },
-  transacaoInfo: {
-    flex: 1,
-  },
-  transacaoDescricao: {
-    fontSize: 15,
-    color: colors.text,
-    fontWeight: '600',
-  },
-  transacaoDetalhe: {
-    fontSize: 12,
-    color: colors.textMuted,
-    marginTop: 2,
-  },
-  simulacaoValor: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.text,
   },
 });
