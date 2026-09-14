@@ -43,6 +43,20 @@ function diferencaEmMeses(mesA: string, mesB: string): number {
   return (anoA * 12 + mA) - (anoB * 12 + mB);
 }
 
+// Uma transação "se aplica" a um mês se: for única e tiver acontecido nesse
+// mês exato, ou for mensal e esse mês estiver dentro do intervalo dela
+// (começou antes ou nesse mês, e ainda não passou de dataFim). Extraída
+// porque tanto a projeção quanto as métricas de saúde financeira (gasto por
+// categoria, taxa de poupança) precisam responder exatamente essa mesma
+// pergunta — antes essa lógica só existia dentro do loop de
+// calcularSaldoProjetado.
+export function transacaoSeAplicaNoMes(transacao: Transacao, mes: string): boolean {
+  const mesDaTransacao = formatarMes(transacao.data);
+  return transacao.frequencia === 'unica'
+    ? mesDaTransacao === mes
+    : mes >= mesDaTransacao && (transacao.dataFim === null || mes <= formatarMes(transacao.dataFim));
+}
+
 // Quantos salários olhar pra trás pra calcular a renda fixa projetada.
 const QUANTIDADE_SALARIOS_PARA_MEDIA = 3;
 
@@ -185,14 +199,7 @@ export function calcularSaldoProjetado(
     let jaTemReceitaRegistradaNesseMes = false;
 
     for (const transacao of transacoes) {
-      const mesDaTransacao = formatarMes(transacao.data);
-      const seAplicaEsseMes =
-        transacao.frequencia === 'unica'
-          ? mesDaTransacao === mes
-          : mes >= mesDaTransacao &&
-            (transacao.dataFim === null || mes <= formatarMes(transacao.dataFim));
-
-      if (!seAplicaEsseMes) continue;
+      if (!transacaoSeAplicaNoMes(transacao, mes)) continue;
 
       if (transacao.tipo === 'receita') {
         entradas += transacao.valor;

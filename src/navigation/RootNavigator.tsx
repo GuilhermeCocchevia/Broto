@@ -7,11 +7,13 @@ import NovaCategoriaScreen from '../screens/NovaCategoriaScreen';
 import NovaSimulacaoScreen from '../screens/NovaSimulacaoScreen';
 import AtualizarSaldoScreen from '../screens/AtualizarSaldoScreen';
 import CategoriasScreen from '../screens/CategoriasScreen';
+import ResumoScreen from '../screens/ResumoScreen';
 
 export type RootStackParamList = {
   Dashboard: undefined;
   Simulador: undefined;
   Categorias: undefined;
+  Resumo: undefined;
   // `id` presente = editar aquele registro; ausente = criar um novo.
   // O `?` em `{ id?: string } | undefined` permite tanto navigate('NovaTransacao')
   // (sem parâmetro nenhum) quanto navigate('NovaTransacao', { id: '...' }).
@@ -34,6 +36,7 @@ export default function RootNavigator() {
           component={CategoriasScreen}
           options={{ title: 'Categorias' }}
         />
+        <Stack.Screen name="Resumo" component={ResumoScreen} options={{ title: 'Resumo' }} />
         <Stack.Screen
           name="NovaTransacao"
           component={NovaTransacaoScreen}
