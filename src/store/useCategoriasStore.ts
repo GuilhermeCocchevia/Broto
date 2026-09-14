@@ -14,7 +14,10 @@ type CategoriasState = {
   categorias: Categoria[];
   carregando: boolean;
   carregar: () => Promise<void>;
-  adicionar: (nova: NovaCategoria) => Promise<void>;
+  // Devolve o id da categoria criada — quem chama às vezes precisa dele na
+  // hora (ex: criar uma transação pra uma categoria nova, os dois no mesmo
+  // fluxo, sem esperar a tela recarregar pra descobrir o id).
+  adicionar: (nova: NovaCategoria) => Promise<string>;
   atualizar: (id: string, dados: NovaCategoria) => Promise<void>;
   remover: (id: string) => Promise<void>;
 };
@@ -43,6 +46,7 @@ export const useCategoriasStore = create<CategoriasState>()((set, get) => ({
     // Depois de inserir, recarrega a lista do banco — assim a tela sempre mostra
     // o que está salvo de verdade, não uma cópia otimista que pode divergir.
     await get().carregar();
+    return id;
   },
 
   atualizar: async (id, dados) => {

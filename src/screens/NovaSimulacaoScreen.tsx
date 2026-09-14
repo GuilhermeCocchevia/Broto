@@ -6,11 +6,16 @@ import type { RouteProp } from '@react-navigation/native';
 import { colors } from '../theme/colors';
 import { useCategoriasStore } from '../store/useCategoriasStore';
 import { useSimulacoesStore } from '../store/useSimulacoesStore';
-import { OpcaoBotao } from '../components/OpcaoBotao';
+import { CampoCategoria } from '../components/CampoCategoria';
 import { parsearValorMonetario } from '../utils/parsearValorMonetario';
 import { validarData } from '../utils/validarData';
 import { mensagemDeErro } from '../utils/mensagemDeErro';
+import { escolherCorAutomatica, encontrarCategoriaPorNome } from '../utils/resolverOuCriarCategoria';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+
+// Uma simulação é sempre uma compra hipotética — não existe "simulação de
+// receita" no app hoje, então a categoria dela é sempre do tipo despesa.
+const TIPO_SIMULACAO = 'despesa' as const;
 
 // Formulário de "e se eu comprar isso?" — cria uma Simulacao (compra
 // hipotética, possivelmente parcelada) que entra na projeção do Simulador
@@ -21,6 +26,7 @@ export default function NovaSimulacaoScreen() {
   const idEditando = route.params?.id;
 
   const categorias = useCategoriasStore((state) => state.categorias);
+  const adicionarCategoria = useCategoriasStore((state) => state.adicionar);
   const simulacoes = useSimulacoesStore((state) => state.simulacoes);
   const adicionar = useSimulacoesStore((state) => state.adicionar);
   const atualizar = useSimulacoesStore((state) => state.atualizar);
@@ -30,7 +36,7 @@ export default function NovaSimulacaoScreen() {
   const [valorTotalTexto, setValorTotalTexto] = useState('');
   const [parcelasTexto, setParcelasTexto] = useState('1');
   const [dataInicio, setDataInicio] = useState(new Date().toISOString().slice(0, 10));
-  const [categoriaId, setCategoriaId] = useState<string | null>(null);
+  const [categoriaTexto, setCategoriaTexto] = useState('');
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
 
@@ -46,9 +52,10 @@ export default function NovaSimulacaoScreen() {
       setValorTotalTexto(String(simulacao.valorTotal));
       setParcelasTexto(String(simulacao.parcelas));
       setDataInicio(simulacao.dataInicio);
-      setCategoriaId(simulacao.categoriaId);
+      const categoriaAtual = categorias.find((c) => c.id === simulacao.categoriaId);
+      setCategoriaTexto(categoriaAtual?.nome ?? '');
     }
-  }, [idEditando, simulacoes]);
+  }, [idEditando, simulacoes, categorias]);
 
   // async: só volta pra tela anterior depois de confirmar que gravou de
   // verdade — ver o comentário equivalente em NovaCategoriaScreen.tsx.
@@ -74,14 +81,23 @@ export default function NovaSimulacaoScreen() {
       setErro('Data inválida. Use o formato AAAA-MM-DD, ex: 2026-09-14.');
       return;
     }
-    if (!categoriaId) {
-      setErro('Escolha uma categoria.');
+    if (!categoriaTexto.trim()) {
+      setErro('Escolha ou digite uma categoria.');
       return;
     }
 
     setErro(null);
     setSalvando(true);
     try {
+      const categoriaExistente = encontrarCategoriaPorNome(categorias, categoriaTexto, TIPO_SIMULACAO);
+      const categoriaId = categoriaExistente
+        ? categoriaExistente.id
+        : await adicionarCategoria({
+            nome: categoriaTexto.trim(),
+            tipo: TIPO_SIMULACAO,
+            cor: escolherCorAutomatica(categorias.length),
+          });
+
       const dados = { descricao: descricao.trim(), valorTotal, parcelas, dataInicio, categoriaId };
       if (idEditando) {
         await atualizar(idEditando, dados);
@@ -150,21 +166,12 @@ export default function NovaSimulacaoScreen() {
       />
 
       <Text style={styles.rotulo}>Categoria</Text>
-      <View style={styles.opcoes}>
-        {categorias.map((categoria) => (
-          <OpcaoBotao
-            key={categoria.id}
-            label={categoria.nome}
-            selecionado={categoriaId === categoria.id}
-            onPress={() => setCategoriaId(categoria.id)}
-          />
-        ))}
-        {categorias.length === 0 && (
-          <Text style={styles.avisoSemCategoria}>
-            Nenhuma categoria cadastrada ainda — crie uma no Dashboard primeiro.
-          </Text>
-        )}
-      </View>
+      <CampoCategoria
+        tipo={TIPO_SIMULACAO}
+        categorias={categorias}
+        valor={categoriaTexto}
+        onChangeValor={setCategoriaTexto}
+      />
 
       {erro && <Text style={styles.erro}>{erro}</Text>}
 
@@ -209,15 +216,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 16,
     color: colors.text,
-  },
-  opcoes: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  avisoSemCategoria: {
-    color: colors.danger,
-    fontSize: 13,
   },
   erro: {
     color: colors.danger,

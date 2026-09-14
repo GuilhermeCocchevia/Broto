@@ -50,9 +50,16 @@ export default function NovaCategoriaScreen() {
   const [cor, setCor] = useState(CORES_DISPONIVEIS[0]);
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
-  // Controla se as sugestões aparecem: só faz sentido mostrar enquanto o
-  // usuário está de fato digitando nesse campo, não depois que ele já saiu.
-  const [campoNomeFocado, setCampoNomeFocado] = useState(false);
+  // Três estados em vez de depender de onFocus/onBlur com timer: essa
+  // versão anterior tinha um bug real (apagar o texto e digitar de novo
+  // deixava as sugestões escondidas pra sempre) porque depender de EVENTO
+  // DE FOCO pra decidir visibilidade é frágil — o foco pode "piscar" por
+  // mudança de layout, sem o usuário ter saído do campo de verdade.
+  // 'inicial' = ainda não mexeu; 'digitando' = editando agora, mostra
+  // sugestões; 'confirmado' = tocou numa sugestão, esconde a lista.
+  const [estadoCampoNome, setEstadoCampoNome] = useState<'inicial' | 'digitando' | 'confirmado'>(
+    'inicial',
+  );
 
   // Sugestões filtradas pelo que já foi digitado, olhando só a lista do tipo
   // selecionado (receita ou despesa) — muda sozinho se o usuário trocar o
@@ -69,6 +76,8 @@ export default function NovaCategoriaScreen() {
       .filter((sugestao) => normalizarTexto(textoBuscavelDaSugestao(sugestao)).includes(nomeNormalizado))
       .slice(0, MAXIMO_SUGESTOES);
   }, [nome, tipo]);
+
+  const mostrarSugestoesNome = estadoCampoNome === 'digitando' && sugestoes.length > 0;
 
   // Muda o título no cabeçalho pra deixar claro se é edição ou criação —
   // `navigation.setOptions` é como você muda as opções da própria tela (título,
@@ -139,21 +148,14 @@ export default function NovaCategoriaScreen() {
       <TextInput
         style={styles.input}
         value={nome}
-        onChangeText={setNome}
-        placeholder="Ex: Alimentação"
-        onFocus={() => setCampoNomeFocado(true)}
-        onBlur={() => {
-          // Pequeno atraso de propósito: sem ele, tocar num chip de sugestão
-          // faz o TextInput perder o foco (onBlur) ANTES do onPress do chip
-          // processar o toque — a lista de sugestões some e o clique se
-          // perde no meio do caminho. 150ms é tempo de sobra pro toque ser
-          // processado, mas curto o bastante pra não incomodar quem só quer
-          // sair do campo mesmo.
-          setTimeout(() => setCampoNomeFocado(false), 150);
+        onChangeText={(texto) => {
+          setNome(texto);
+          setEstadoCampoNome('digitando');
         }}
+        placeholder="Ex: Alimentação"
       />
 
-      {campoNomeFocado && sugestoes.length > 0 && (
+      {mostrarSugestoesNome && (
         <View style={styles.opcoes}>
           {sugestoes.map((sugestao) => (
             <OpcaoBotao
@@ -162,7 +164,7 @@ export default function NovaCategoriaScreen() {
               selecionado={false}
               onPress={() => {
                 setNome(sugestao.nome);
-                setCampoNomeFocado(false);
+                setEstadoCampoNome('confirmado');
               }}
             />
           ))}

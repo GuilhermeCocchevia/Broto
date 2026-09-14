@@ -7,9 +7,11 @@ import { colors } from '../theme/colors';
 import { useCategoriasStore } from '../store/useCategoriasStore';
 import { useTransacoesStore } from '../store/useTransacoesStore';
 import { OpcaoBotao } from '../components/OpcaoBotao';
+import { CampoCategoria } from '../components/CampoCategoria';
 import { parsearValorMonetario } from '../utils/parsearValorMonetario';
 import { validarData } from '../utils/validarData';
 import { mensagemDeErro } from '../utils/mensagemDeErro';
+import { escolherCorAutomatica, encontrarCategoriaPorNome } from '../utils/resolverOuCriarCategoria';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import type { TipoTransacao, Frequencia } from '../types/models';
 
@@ -25,6 +27,7 @@ export default function NovaTransacaoScreen() {
   const idEditando = route.params?.id;
 
   const categorias = useCategoriasStore((state) => state.categorias);
+  const adicionarCategoria = useCategoriasStore((state) => state.adicionar);
   const transacoes = useTransacoesStore((state) => state.transacoes);
   const adicionar = useTransacoesStore((state) => state.adicionar);
   const atualizar = useTransacoesStore((state) => state.atualizar);
@@ -38,7 +41,11 @@ export default function NovaTransacaoScreen() {
   // Texto vazio = "repete pra sempre" (vira `null` ao salvar). Só é usado de
   // verdade quando frequencia === 'mensal' — ver o campo mais abaixo no JSX.
   const [dataFimTexto, setDataFimTexto] = useState('');
-  const [categoriaId, setCategoriaId] = useState<string | null>(null);
+  // Nome digitado no campo de categoria — não é mais um id de categoria já
+  // escolhida. Resolvido (ou criado, se for nome novo) só na hora de salvar,
+  // ver salvar() abaixo. Isso é o que junta "escolher categoria" e "criar
+  // categoria nova" num campo só, em vez de duas telas separadas.
+  const [categoriaTexto, setCategoriaTexto] = useState('');
   const [erro, setErro] = useState<string | null>(null);
   // Impede clique duplo: enquanto uma gravação está em andamento, o botão
   // fica desabilitado — sem isso, dois toques rápidos disparavam duas
@@ -59,9 +66,12 @@ export default function NovaTransacaoScreen() {
       setTipo(transacao.tipo);
       setFrequencia(transacao.frequencia);
       setDataFimTexto(transacao.dataFim ?? '');
-      setCategoriaId(transacao.categoriaId);
+      // O campo guarda o NOME da categoria, não o id — então precisa achar
+      // a categoria pelo id salvo na transação e pegar o nome dela.
+      const categoriaAtual = categorias.find((c) => c.id === transacao.categoriaId);
+      setCategoriaTexto(categoriaAtual?.nome ?? '');
     }
-  }, [idEditando, transacoes]);
+  }, [idEditando, transacoes, categorias]);
 
   // async: só volta pra tela anterior depois de confirmar que gravou de
   // verdade — ver o comentário equivalente em NovaCategoriaScreen.tsx.
@@ -87,14 +97,27 @@ export default function NovaTransacaoScreen() {
       setErro('Data final inválida. Use o formato AAAA-MM-DD, ou deixe em branco.');
       return;
     }
-    if (!categoriaId) {
-      setErro('Escolha uma categoria.');
+    if (!categoriaTexto.trim()) {
+      setErro('Escolha ou digite uma categoria.');
       return;
     }
 
     setErro(null);
     setSalvando(true);
     try {
+      // Resolve a categoria pelo nome digitado: se já existe uma com esse
+      // nome (e o mesmo tipo receita/despesa), reaproveita ela. Se não,
+      // cria uma categoria nova na hora — é isso que junta "escolher" e
+      // "criar" categoria num campo só.
+      const categoriaExistente = encontrarCategoriaPorNome(categorias, categoriaTexto, tipo);
+      const categoriaId = categoriaExistente
+        ? categoriaExistente.id
+        : await adicionarCategoria({
+            nome: categoriaTexto.trim(),
+            tipo,
+            cor: escolherCorAutomatica(categorias.length),
+          });
+
       const dados = {
         descricao: descricao.trim(),
         valor,
@@ -194,21 +217,12 @@ export default function NovaTransacaoScreen() {
       )}
 
       <Text style={styles.rotulo}>Categoria</Text>
-      <View style={styles.opcoes}>
-        {categorias.map((categoria) => (
-          <OpcaoBotao
-            key={categoria.id}
-            label={categoria.nome}
-            selecionado={categoriaId === categoria.id}
-            onPress={() => setCategoriaId(categoria.id)}
-          />
-        ))}
-        {categorias.length === 0 && (
-          <Text style={styles.avisoSemCategoria}>
-            Nenhuma categoria cadastrada ainda — crie uma no Dashboard primeiro.
-          </Text>
-        )}
-      </View>
+      <CampoCategoria
+        tipo={tipo}
+        categorias={categorias}
+        valor={categoriaTexto}
+        onChangeValor={setCategoriaTexto}
+      />
 
       {erro && <Text style={styles.erro}>{erro}</Text>}
 
@@ -258,10 +272,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-  },
-  avisoSemCategoria: {
-    color: colors.danger,
-    fontSize: 13,
   },
   erro: {
     color: colors.danger,
