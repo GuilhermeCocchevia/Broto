@@ -4,10 +4,12 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors } from '../theme/colors';
 import { useCategoriasStore } from '../store/useCategoriasStore';
+import { useTransacoesStore } from '../store/useTransacoesStore';
 import { useSaldoInicialStore } from '../store/useSaldoInicialStore';
 import { obterSaldoAtual } from '../logic/projecao';
 import { formatarReal } from '../utils/formatarReal';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import type { Categoria } from '../types/models';
 
 export default function DashboardScreen() {
   // useNavigation<...> tipado com RootStackParamList: dá autocomplete e erro de
@@ -19,6 +21,8 @@ export default function DashboardScreen() {
   // `categorias` muda — não quando `carregando` muda, por exemplo.
   const categorias = useCategoriasStore((state) => state.categorias);
   const carregar = useCategoriasStore((state) => state.carregar);
+  const transacoes = useTransacoesStore((state) => state.transacoes);
+  const carregarTransacoes = useTransacoesStore((state) => state.carregar);
   const saldosIniciais = useSaldoInicialStore((state) => state.saldosIniciais);
   const carregarSaldoInicial = useSaldoInicialStore((state) => state.carregar);
 
@@ -26,10 +30,30 @@ export default function DashboardScreen() {
   // (igual componentDidMount das classes antigas do React).
   useEffect(() => {
     carregar();
+    carregarTransacoes();
     carregarSaldoInicial();
-  }, [carregar, carregarSaldoInicial]);
+  }, [carregar, carregarTransacoes, carregarSaldoInicial]);
 
   const saldoAtual = useMemo(() => obterSaldoAtual(saldosIniciais), [saldosIniciais]);
+
+  // Map pra achar a categoria de cada transação em O(1) na hora de renderizar,
+  // em vez de fazer `categorias.find(...)` (O(n)) dentro de cada item da lista.
+  const categoriaPorId = useMemo(() => {
+    const mapa = new Map<string, Categoria>();
+    for (const categoria of categorias) {
+      mapa.set(categoria.id, categoria);
+    }
+    return mapa;
+  }, [categorias]);
+
+  // Extrato: mais recente primeiro. `[...transacoes]` copia o array antes de
+  // ordenar — `.sort()` ordena "no lugar" (muta o array original), e mutar o
+  // array que vive dentro da store por baixo dos panos do Zustand é o tipo de
+  // bug sutil que só aparece bem mais tarde.
+  const transacoesRecentesPrimeiro = useMemo(
+    () => [...transacoes].sort((a, b) => (a.data < b.data ? 1 : -1)),
+    [transacoes],
+  );
 
   return (
     <View style={styles.container}>
@@ -61,14 +85,36 @@ export default function DashboardScreen() {
 
       <FlatList
         style={styles.lista}
-        data={categorias}
+        data={transacoesRecentesPrimeiro}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <View style={styles.categoriaItem}>
-            <View style={[styles.categoriaCor, { backgroundColor: item.cor }]} />
-            <Text style={styles.categoriaNome}>{item.nome}</Text>
-          </View>
-        )}
+        ListEmptyComponent={
+          <Text style={styles.listaVazia}>Nenhuma transação lançada ainda.</Text>
+        }
+        renderItem={({ item }) => {
+          const categoria = categoriaPorId.get(item.categoriaId);
+          const sinal = item.tipo === 'receita' ? '+' : '-';
+          return (
+            <View style={styles.transacaoItem}>
+              <View
+                style={[
+                  styles.transacaoCor,
+                  { backgroundColor: categoria?.cor ?? colors.textMuted },
+                ]}
+              />
+              <View style={styles.transacaoInfo}>
+                <Text style={styles.transacaoDescricao}>{item.descricao}</Text>
+                <Text style={styles.transacaoDetalhe}>
+                  {categoria?.nome ?? 'Sem categoria'} · {item.data}
+                  {item.frequencia === 'mensal' ? ' · repete todo mês' : ''}
+                </Text>
+              </View>
+              <Text style={item.tipo === 'receita' ? styles.transacaoReceita : styles.transacaoDespesa}>
+                {sinal}
+                {formatarReal(item.valor)}
+              </Text>
+            </View>
+          );
+        }}
       />
     </View>
   );
@@ -125,21 +171,45 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingHorizontal: 24,
   },
-  categoriaItem: {
+  listaVazia: {
+    textAlign: 'center',
+    color: colors.textMuted,
+    marginTop: 24,
+  },
+  transacaoItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: colors.surface,
   },
-  categoriaCor: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+  transacaoCor: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
   },
-  categoriaNome: {
-    fontSize: 16,
+  transacaoInfo: {
+    flex: 1,
+  },
+  transacaoDescricao: {
+    fontSize: 15,
     color: colors.text,
+    fontWeight: '600',
+  },
+  transacaoDetalhe: {
+    fontSize: 12,
+    color: colors.textMuted,
+    marginTop: 2,
+  },
+  transacaoReceita: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.success,
+  },
+  transacaoDespesa: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.danger,
   },
 });
