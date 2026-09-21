@@ -21,3 +21,11 @@ export function formatarDataBr(iso: string): string {
   const [ano, mes, dia] = iso.split('-');
   return `${dia}/${mes}/${ano}`;
 }
+
+// Mês no formato brasileiro: 'AAAA-MM' -> 'MM/AAAA' (ex: '2027-09' -> '09/2027').
+// É o que aparece nos textos pra pessoa (o formato ISO 'AAAA-MM' é só de
+// armazenamento e de cálculo).
+export function formatarMesBr(mes: string): string {
+  const [ano, numero] = mes.split('-');
+  return `${numero}/${ano}`;
+}

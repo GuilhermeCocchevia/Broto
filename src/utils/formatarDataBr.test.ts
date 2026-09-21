@@ -1,4 +1,4 @@
-import { converterIsoParaDate, converterDateParaIso, formatarDataBr } from './formatarDataBr';
+import { converterIsoParaDate, converterDateParaIso, formatarDataBr, formatarMesBr } from './formatarDataBr';
 
 test('formatarDataBr troca AAAA-MM-DD por DD/MM/AAAA', () => {
   expect(formatarDataBr('2026-09-16')).toBe('16/09/2026');
@@ -20,4 +20,10 @@ test('converterIsoParaDate usa hora local, sem deslocar o dia (não usa UTC)', (
   expect(data.getFullYear()).toBe(2026);
   expect(data.getMonth()).toBe(0);
   expect(data.getDate()).toBe(1);
+});
+
+test('formatarMesBr troca AAAA-MM por MM/AAAA', () => {
+  expect(formatarMesBr('2027-09')).toBe('09/2027');
+  expect(formatarMesBr('2026-12')).toBe('12/2026');
+  expect(formatarMesBr('2027-01')).toBe('01/2027');
 });

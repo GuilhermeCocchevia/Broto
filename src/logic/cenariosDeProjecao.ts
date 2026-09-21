@@ -5,6 +5,7 @@
 import type { EstimativaDeGastos } from './estimativaDeGastos';
 import { calcularReducaoMensalNecessaria, type ResultadoViabilidade } from './projecao';
 import { formatarReal } from '../utils/formatarReal';
+import { formatarMesBr } from '../utils/formatarDataBr';
 
 // O cenário "mais pesado" assume 20% a mais de gasto no dia a dia — uma margem
 // simples e explicável pra imprevistos (não pretende prever nada: com 1 a 3
@@ -85,7 +86,7 @@ export function temFaixaDeCenarios(esperado: ResultadoViabilidade, pesado: Resul
 export function montarAvisoDeFolga(esperado: ResultadoViabilidade, pesado: ResultadoViabilidade): string | null {
   if (!esperado.viavel || pesado.viavel) return null;
   const pct = Math.round((FATOR_IMPREVISTOS - 1) * 100);
-  return `Mas com pouca folga: se seus gastos do dia a dia subirem ${pct}%, o saldo ficaria negativo em ${pesado.piorMes} (linha tracejada).`;
+  return `Mas com pouca folga: se seus gastos do dia a dia subirem ${pct}%, o saldo ficaria negativo em ${formatarMesBr(pesado.piorMes)} (linha tracejada).`;
 }
 
 // O texto do cartão "E se eu gastar menos?" — sempre descritivo e com números.
@@ -119,7 +120,7 @@ export function descreverEseSe({
   if (esperado.viavel) {
     return `Com ${reducaoPct}% a menos no dia a dia (${formatarReal(economia)} por mês), a meta cabe.`;
   }
-  return `Com ${reducaoPct}% a menos no dia a dia (${formatarReal(economia)} por mês), o saldo ainda fica negativo em ${esperado.piorMes}.`;
+  return `Com ${reducaoPct}% a menos no dia a dia (${formatarReal(economia)} por mês), o saldo ainda fica negativo em ${formatarMesBr(esperado.piorMes)}.`;
 }
 
 // O que dizer, e o que oferecer, quando uma meta de GUARDAR dinheiro (economia,

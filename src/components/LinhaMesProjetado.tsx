@@ -4,6 +4,7 @@ import Svg, { Defs, Ellipse, RadialGradient, Stop } from 'react-native-svg';
 import { colors } from '../theme/colors';
 import { formatarReal } from '../utils/formatarReal';
 import type { MesProjetado } from '../logic/projecao';
+import { formatarMesBr } from '../utils/formatarDataBr';
 
 // Uma linha de mês projetado (entradas, saídas, saldo acumulado) — extraída
 // daqui (em vez de ficar direta no `.map()` de quem usa) porque o brilho
@@ -19,7 +20,7 @@ export function LinhaMesProjetado({ item, cor }: { item: MesProjetado; cor: stri
   const idGradiente = useId();
   return (
     <View style={styles.linha}>
-      <Text style={styles.mes}>{item.mes}</Text>
+      <Text style={styles.mes}>{formatarMesBr(item.mes)}</Text>
       <View style={styles.valores}>
         <Text style={styles.entradas}>+{formatarReal(item.entradas)}</Text>
         <Text style={styles.saidas}>-{formatarReal(item.saidas)}</Text>

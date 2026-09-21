@@ -22,6 +22,7 @@ import { useSimulacoesStore } from '../store/useSimulacoesStore';
 import { useSaldoInicialStore } from '../store/useSaldoInicialStore';
 import { avaliarViabilidadeConjunta, calcularParcelaEfetiva } from '../logic/projecao';
 import { formatarReal } from '../utils/formatarReal';
+import { formatarMesBr } from '../utils/formatarDataBr';
 
 // "Dá pra fazer essa compra E bater essa meta de economia ao mesmo tempo,
 // com o que eu realmente ganho e gasto?" — escolha 2 ou mais simulações
@@ -100,7 +101,7 @@ export default function CompararSimulacoesScreen() {
     const nomes = simulacoesEscolhidas.map((s) => `"${s.descricao}"`).join(' + ');
     const comEseSe = reducaoPct > 0 ? `Com ${reducaoPct}% a menos no dia a dia, ` : '';
     const avisoDeFolga = montarAvisoDeFolga(cenarios.esperado, cenarios.pesado);
-    const situacao = `${reducaoPct > 0 ? `${comEseSe}fazendo` : 'Fazendo'} ${nomes} ao mesmo tempo, seu saldo fica negativo em ${resultado.piorMes} (ficaria em ${formatarReal(resultado.piorSaldo)}).`;
+    const situacao = `${reducaoPct > 0 ? `${comEseSe}fazendo` : 'Fazendo'} ${nomes} ao mesmo tempo, seu saldo fica negativo em ${formatarMesBr(resultado.piorMes)} (ficaria em ${formatarReal(resultado.piorSaldo)}).`;
     return {
       viavel:
         `${comEseSe ? `${comEseSe}dá` : 'Dá'} pra fazer ${nomes} ao mesmo tempo, sem faltar dinheiro pro resto das suas contas.` +

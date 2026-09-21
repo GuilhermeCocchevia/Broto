@@ -10,6 +10,7 @@ import {
   type Avaliador,
 } from './cenariosDeProjecao';
 import { avaliarViabilidadeSimulacao } from './projecao';
+import { formatarMesBr } from '../utils/formatarDataBr';
 import { estimarGastosFuturos, type EstimativaDeGastos } from './estimativaDeGastos';
 import type { Simulacao, Transacao } from '../types/models';
 
@@ -147,7 +148,9 @@ test('montarAvisoDeFolga: viável no esperado mas não com 20% a mais → aviso 
   expect(pesado.viavel).toBe(false);
   const aviso = montarAvisoDeFolga(esperado, pesado)!;
   expect(aviso).toMatch(/20%/);
-  expect(aviso).toContain(pesado.piorMes);
+  expect(aviso).toContain(formatarMesBr(pesado.piorMes));
+  // ...no formato brasileiro (MM/AAAA), não no ISO.
+  expect(aviso).not.toContain(pesado.piorMes);
   expect(temFaixaDeCenarios(esperado, pesado)).toBe(true);
 });
 
@@ -191,7 +194,8 @@ test('descreverEseSe: cada situação tem uma frase calma e com números', () =>
   expect(descreverEseSe({ reducaoPct: 10, corteNecessario: 5, gastoDoDiaADia: 2790, esperado: ok })).toMatch(/10% a menos.*cabe/);
   const ainda = descreverEseSe({ reducaoPct: 2, corteNecessario: 5, gastoDoDiaADia: 2790, esperado: ruim });
   expect(ainda).toMatch(/ainda/);
-  expect(ainda).toContain('2027-03');
+  expect(ainda).toContain('03/2027');
+  expect(ainda).not.toContain('2027-03');
 });
 
 test('sugestaoParaMetaDeGuardar: cortar resolve → valor exato por mês (o mesmo do Dashboard) e oferece o botão', () => {

@@ -12,6 +12,7 @@ import { ItemLista } from '../components/ItemLista';
 import { useCategoriaPorId } from '../hooks/useCategoriaPorId';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import type { Transacao } from '../types/models';
+import { formatarDataBr } from '../utils/formatarDataBr';
 
 // Dentro de cada seção (fixas ou únicas), receita sempre vem antes de
 // despesa — não importa a data — pra ficar óbvio de relance "isso é
@@ -97,7 +98,7 @@ export default function ExtratoScreen() {
         key={item.id}
         {...marcador}
         titulo={item.descricao}
-        subtitulo={`${categoria?.nome ?? 'Sem categoria'} · ${item.data}`}
+        subtitulo={`${categoria?.nome ?? 'Sem categoria'} · ${formatarDataBr(item.data)}`}
         valorTexto={`${sinal}${formatarReal(item.valor)}`}
         valorCor={item.tipo === 'receita' ? colors.success : colors.danger}
         onPress={() => navigation.navigate('NovaTransacao', { id: item.id })}

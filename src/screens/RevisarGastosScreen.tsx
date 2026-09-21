@@ -14,6 +14,7 @@ import { formatarReal } from '../utils/formatarReal';
 import { corDaDespesa } from '../utils/corPorValor';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { mesAtualLocal } from '../utils/dataLocal';
+import { formatarDataBr, formatarMesBr } from '../utils/formatarDataBr';
 
 // "Rever gastos": um extrato só com as despesas do mês, da mais cara pra
 // mais barata — o ponto de partida natural pra quem precisa cortar gasto
@@ -73,7 +74,7 @@ export default function RevisarGastosScreen() {
 
         {despesas.length > 0 && (
           <Text style={styles.total}>
-            Despesas de {mesAtual}: {formatarReal(totalDoMes)}
+            Despesas de {formatarMesBr(mesAtual)}: {formatarReal(totalDoMes)}
           </Text>
         )}
 
@@ -88,7 +89,7 @@ export default function RevisarGastosScreen() {
               brilho
               titulo={item.descricao}
               subtitulo={`${categoriaPorId.get(item.categoriaId)?.nome ?? 'Sem categoria'} · ${
-                item.frequencia === 'mensal' ? 'fixa mensal' : item.data
+                item.frequencia === 'mensal' ? 'fixa mensal' : formatarDataBr(item.data)
               }`}
               valorTexto={`-${formatarReal(item.valor)}`}
               valorCor={colors.danger}

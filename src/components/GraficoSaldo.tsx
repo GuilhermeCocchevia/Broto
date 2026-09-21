@@ -1,22 +1,15 @@
+import { useState } from 'react';
 import { Dimensions, StyleSheet, Text, View } from 'react-native';
 import { LineChart } from 'react-native-gifted-charts';
 import { colors } from '../theme/colors';
 import { formatarReal } from '../utils/formatarReal';
 import { corDoSaldo } from '../utils/corPorValor';
 import { calcularEscalaDoGrafico } from '../utils/escalaGrafico';
+import { abreviarMes } from '../utils/abreviarMes';
+import { GraficoApex, apexDisponivel } from './GraficoApex';
 import { FATOR_IMPREVISTOS } from '../logic/cenariosDeProjecao';
 import { calcularMesesDeGastoCobertos } from '../logic/saudeFinanceira';
 import type { MesProjetado } from '../logic/projecao';
-
-// Abrevia 'AAAA-MM' pro nome curto do mês em português, só pro eixo do
-// gráfico não ficar poluído com "2026-10" embaixo de cada ponto.
-const MESES_ABREVIADOS = [
-  'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez',
-];
-function abreviarMes(mes: string): string {
-  const numeroDoMes = Number(mes.slice(5, 7));
-  return MESES_ABREVIADOS[numeroDoMes - 1];
-}
 
 // Largura do gráfico = largura da tela menos o padding da tela (24 de cada
 // lado, ver `conteudo` em SimuladorScreen) — sem isso o gráfico ou vaza da
@@ -41,18 +34,48 @@ const ESPACO_LATERAL = 12;
 // mora na tabela.
 const PROPORCAO_MAXIMA_NEGATIVA = 1.5;
 
-export function GraficoSaldo({
-  saldoAtual,
-  meses,
-  mesesPesado,
-}: {
+type PropsDoGrafico = {
   saldoAtual: number;
   meses: MesProjetado[];
   // Cenário "mais pesado" (ver cenariosDeProjecao.ts), desenhado como uma
   // segunda linha tracejada — a faixa entre o esperado e o pior razoável.
   // Ausente = só a linha esperada.
   mesesPesado?: MesProjetado[];
-}) {
+};
+
+// Cor da linha/área principal: a "saúde" do PIOR saldo da série (ver
+// corDoSaldo) — a mesma regra nos dois gráficos (Apex e nativo). A referência
+// é a média de saída mensal da própria janela: "quantos meses, no ritmo de
+// gasto DESSA simulação, esse saldo aguentaria".
+function calcularCorDaLinha(saldoAtual: number, meses: MesProjetado[]): string {
+  const despesaMediaDoPeriodo = meses.reduce((soma, mes) => soma + mes.saidas, 0) / meses.length;
+  const piorSaldo = Math.min(saldoAtual, ...meses.map((mes) => mes.saldo));
+  return corDoSaldo(calcularMesesDeGastoCobertos(piorSaldo, despesaMediaDoPeriodo));
+}
+
+// O gráfico de saldo das simulações: usa o ApexCharts (numa WebView, ver
+// GraficoApex.tsx) quando o módulo nativo da WebView existe neste build do app
+// e cai no gráfico nativo (gifted-charts, logo abaixo) quando não existe
+// (build antigo, antes de `npx expo run:ios`) ou se a WebView falhar — o
+// usuário sempre vê um gráfico.
+export function GraficoSaldo(props: PropsDoGrafico) {
+  const [apexFalhou, setApexFalhou] = useState(false);
+
+  if (props.meses.length > 0 && !apexFalhou && apexDisponivel()) {
+    return (
+      <GraficoApex
+        saldoAtual={props.saldoAtual}
+        meses={props.meses}
+        mesesPesado={props.mesesPesado}
+        corLinha={calcularCorDaLinha(props.saldoAtual, props.meses)}
+        onFalha={() => setApexFalhou(true)}
+      />
+    );
+  }
+  return <GraficoSaldoNativo {...props} />;
+}
+
+function GraficoSaldoNativo({ saldoAtual, meses, mesesPesado }: PropsDoGrafico) {
   const valoresReais = [saldoAtual, ...meses.map((mes) => mes.saldo)];
   // O eixo precisa caber as DUAS linhas, senão a tracejada sairia do quadro.
   const valoresDaEscala = mesesPesado

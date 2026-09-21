@@ -26,6 +26,7 @@ import { BotaoPrimario } from '../components/BotaoPrimario';
 import { useCategoriaPorId } from '../hooks/useCategoriaPorId';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { mesAtualLocal } from '../utils/dataLocal';
+import { formatarDataBr } from '../utils/formatarDataBr';
 
 // Altura (em px) da faixa mais escura que sobra embaixo do botão "de pé" no
 // aviso de sobra — mesma técnica "de botão de jogo pixel" do resto do app
@@ -218,12 +219,12 @@ export default function SimuladorScreen() {
               : '';
             const subtitulo =
               simulacao.tipo === 'aposentadoria'
-                ? `Guarde ${formatarReal(valorDaParcela)}/mês${trechoAporteInicial} por ${simulacao.parcelas} meses · aposentadoria · a partir de ${simulacao.dataInicio}`
+                ? `Guarde ${formatarReal(valorDaParcela)}/mês${trechoAporteInicial} por ${simulacao.parcelas} meses · aposentadoria · a partir de ${formatarDataBr(simulacao.dataInicio)}`
                 : simulacao.tipo === 'rendimento'
-                  ? `Guarde ${formatarReal(valorDaParcela)}/mês${trechoAporteInicial} por ${simulacao.parcelas} meses · rendendo · a partir de ${simulacao.dataInicio}`
+                  ? `Guarde ${formatarReal(valorDaParcela)}/mês${trechoAporteInicial} por ${simulacao.parcelas} meses · rendendo · a partir de ${formatarDataBr(simulacao.dataInicio)}`
                   : simulacao.tipo === 'economia'
-                    ? `Guarde ${formatarReal(valorDaParcela)}/mês por ${simulacao.parcelas} meses · a partir de ${simulacao.dataInicio}`
-                    : `${simulacao.parcelas}x de ${formatarReal(valorDaParcela)} a partir de ${simulacao.dataInicio}`;
+                    ? `Guarde ${formatarReal(valorDaParcela)}/mês por ${simulacao.parcelas} meses · a partir de ${formatarDataBr(simulacao.dataInicio)}`
+                    : `${simulacao.parcelas}x de ${formatarReal(valorDaParcela)} a partir de ${formatarDataBr(simulacao.dataInicio)}`;
             return (
               <ItemLista
                 key={simulacao.id}

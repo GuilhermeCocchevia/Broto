@@ -27,6 +27,7 @@ import { calcularValorFuturoLiquido } from '../logic/custosRendaFixa';
 import { formatarReal } from '../utils/formatarReal';
 import { useCategoriaPorId } from '../hooks/useCategoriaPorId';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { formatarDataBr, formatarMesBr } from '../utils/formatarDataBr';
 
 // A pergunta que essa tela existe pra responder: "dá pra fazer ESSA compra
 // (ou bater ESSA meta) específica, considerando o que eu realmente ganho e
@@ -111,12 +112,12 @@ export default function DetalheSimulacaoScreen() {
       ? ` + ${formatarReal(simulacao.aporteInicial)} de investimento inicial`
       : '';
   const resumo = ehAposentadoria
-    ? `Aposentadoria · guarde ${formatarReal(valorDaParcela)}/mês${trechoAporteInicial} por ${simulacao.parcelas} meses, a partir de ${simulacao.dataInicio}`
+    ? `Aposentadoria · guarde ${formatarReal(valorDaParcela)}/mês${trechoAporteInicial} por ${simulacao.parcelas} meses, a partir de ${formatarDataBr(simulacao.dataInicio)}`
     : ehRendimento
-      ? `Rendimento · guarde ${formatarReal(valorDaParcela)}/mês${trechoAporteInicial} por ${simulacao.parcelas} meses, a partir de ${simulacao.dataInicio}`
+      ? `Rendimento · guarde ${formatarReal(valorDaParcela)}/mês${trechoAporteInicial} por ${simulacao.parcelas} meses, a partir de ${formatarDataBr(simulacao.dataInicio)}`
       : ehEconomia
-        ? `Meta de economia · guarde ${formatarReal(valorDaParcela)}/mês por ${simulacao.parcelas} meses, a partir de ${simulacao.dataInicio}`
-        : `Compra parcelada · ${simulacao.parcelas}x de ${formatarReal(valorDaParcela)}, a partir de ${simulacao.dataInicio}`;
+        ? `Meta de economia · guarde ${formatarReal(valorDaParcela)}/mês por ${simulacao.parcelas} meses, a partir de ${formatarDataBr(simulacao.dataInicio)}`
+        : `Compra parcelada · ${simulacao.parcelas}x de ${formatarReal(valorDaParcela)}, a partir de ${formatarDataBr(simulacao.dataInicio)}`;
 
   // Meta de economia/investimento: o valor guardado é o OBJETIVO, então
   // sugerir "guarde menos" contradiz o que o usuário quer — o que sobra pra
@@ -149,8 +150,8 @@ export default function DetalheSimulacaoScreen() {
     (avisoDeFolga ? ` ${avisoDeFolga}` : '');
 
   const mensagemNaoViavel = ehMetaDeGuardar
-    ? `${reducaoPct > 0 ? `Mesmo com ${reducaoPct}% a menos no dia a dia, seu` : 'Guardando esse valor, seu'} saldo fica negativo em ${resultado.piorMes} (ficaria em ${formatarReal(resultado.piorSaldo)}).${reducaoPct === 0 && sugestao.texto ? ` ${sugestao.texto}` : ''}`
-    : `Essa compra deixaria seu saldo negativo em ${resultado.piorMes} (ficaria em ${formatarReal(resultado.piorSaldo)}). Talvez valha ajustar o valor, o número de parcelas, ou esperar um pouco.`;
+    ? `${reducaoPct > 0 ? `Mesmo com ${reducaoPct}% a menos no dia a dia, seu` : 'Guardando esse valor, seu'} saldo fica negativo em ${formatarMesBr(resultado.piorMes)} (ficaria em ${formatarReal(resultado.piorSaldo)}).${reducaoPct === 0 && sugestao.texto ? ` ${sugestao.texto}` : ''}`
+    : `Essa compra deixaria seu saldo negativo em ${formatarMesBr(resultado.piorMes)} (ficaria em ${formatarReal(resultado.piorSaldo)}). Talvez valha ajustar o valor, o número de parcelas, ou esperar um pouco.`;
 
   // Só existe (e só faz sentido mostrar) quando há taxa de rendimento OU
   // investimento inicial — sem nenhum dos dois, não tem "projeção" nenhuma
