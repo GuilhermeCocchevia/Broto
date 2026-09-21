@@ -14,7 +14,9 @@ import {
   calcularSaidaEfetivaNoMes,
   calcularDespesaVariavelMedia,
   calcularReducaoMensalNecessaria,
+  calcularRendaEsperadaDoMes,
 } from './projecao';
+import { estimarGastosFuturos } from './estimativaDeGastos';
 import type { Transacao, Simulacao, SaldoInicial } from '../types/models';
 
 // Helpers só pra não repetir todo campo em toda transação/simulação de teste —
@@ -741,4 +743,170 @@ test('calcularReducaoMensalNecessaria: o mês MENOS negativo pode ser o que defi
 
 test('calcularReducaoMensalNecessaria: sem nenhum mês devolve 0', () => {
   expect(calcularReducaoMensalNecessaria([])).toBe(0);
+});
+
+// --- Projeção com estimativa de gastos (mês de referência = mês ATUAL) ---
+
+const MES_ATUAL = '2026-09';
+
+function rendaEAluguel(): Transacao[] {
+  return [
+    criarTransacao({ id: 'r', tipo: 'receita', frequencia: 'mensal', valor: 5000, data: '2026-01-05', descricao: 'Salário' }),
+    criarTransacao({ id: 'a', tipo: 'despesa', frequencia: 'mensal', valor: 2000, data: '2026-01-05', descricao: 'Aluguel' }),
+  ];
+}
+
+test('com estimativa: mês FUTURO herda o gasto variável do mês atual (a regra antiga dava zero)', () => {
+  const transacoes = [
+    ...rendaEAluguel(),
+    criarTransacao({ id: 'm', valor: 1000, data: '2026-09-03', descricao: 'Mercado' }),
+  ];
+  const estimativa = estimarGastosFuturos(transacoes, MES_ATUAL);
+
+  const antiga = calcularSaldoProjetado(transacoes, [], '2026-10', 2, 0, 0);
+  const nova = calcularSaldoProjetado(transacoes, [], '2026-10', 2, 0, 0, estimativa);
+
+  // Antiga: outubro não tem avulsa própria → estimativa ancorada em outubro = 0.
+  expect(antiga.map((m) => m.saidas)).toEqual([2000, 2000]);
+  // Nova: aluguel 2000 + variável 1000 em todo mês futuro.
+  expect(nova.map((m) => m.saidas)).toEqual([3000, 3000]);
+});
+
+test('com estimativa: mês atual completa só a diferença até a estimativa (não conta o já lançado 2x)', () => {
+  const transacoes = [
+    ...rendaEAluguel(),
+    // Agosto foi um mês de R$1000 de variável; em setembro só 400 até agora.
+    criarTransacao({ id: 'ago', valor: 1000, data: '2026-08-10', descricao: 'Mercado ago' }),
+    criarTransacao({ id: 'set', valor: 400, data: '2026-09-03', descricao: 'Mercado set' }),
+  ];
+  const estimativa = estimarGastosFuturos(transacoes, MES_ATUAL);
+  expect(estimativa.gastoVariavelMensal).toBe(1000);
+
+  const [setembro] = calcularSaldoProjetado(transacoes, [], MES_ATUAL, 1, 0, 0, estimativa);
+
+  // Aluguel 2000 + os 400 reais + os 600 que faltam pra fechar os 1000 esperados.
+  expect(setembro.saidas).toBe(3000);
+});
+
+test('com estimativa: mês atual sem nenhuma avulsa ainda recebe a estimativa inteira', () => {
+  const transacoes = [
+    ...rendaEAluguel(),
+    criarTransacao({ id: 'ago', valor: 1000, data: '2026-08-10', descricao: 'Mercado ago' }),
+  ];
+  const estimativa = estimarGastosFuturos(transacoes, MES_ATUAL);
+
+  const [setembro] = calcularSaldoProjetado(transacoes, [], MES_ATUAL, 1, 0, 0, estimativa);
+
+  expect(setembro.saidas).toBe(3000);
+});
+
+test('com estimativa: meses ANTERIORES ao atual só têm o que foi lançado (histórico não é estimado)', () => {
+  const transacoes = [
+    ...rendaEAluguel(),
+    criarTransacao({ id: 'set', valor: 1000, data: '2026-09-03', descricao: 'Mercado set' }),
+  ];
+  const estimativa = estimarGastosFuturos(transacoes, MES_ATUAL);
+
+  const [agosto] = calcularSaldoProjetado(transacoes, [], '2026-08', 1, 0, 0, estimativa);
+
+  expect(agosto.saidas).toBe(2000);
+});
+
+test('com estimativa: compra planejada lançada num mês futuro soma POR CIMA do gasto do dia a dia', () => {
+  const transacoes = [
+    ...rendaEAluguel(),
+    criarTransacao({ id: 'm', valor: 1000, data: '2026-09-03', descricao: 'Mercado' }),
+    criarTransacao({ id: 'tv', valor: 3000, data: '2026-10-15', descricao: 'TV planejada' }),
+  ];
+  const estimativa = estimarGastosFuturos(transacoes, MES_ATUAL);
+
+  const [outubro, novembro] = calcularSaldoProjetado(transacoes, [], '2026-10', 2, 0, 0, estimativa);
+
+  // Outubro: aluguel 2000 + TV 3000 + variável 1000. A regra antiga zerava a
+  // estimativa só porque havia UMA avulsa no mês.
+  expect(outubro.saidas).toBe(6000);
+  expect(novembro.saidas).toBe(3000);
+});
+
+test('com estimativa: recorrente na prática (fatura de cartão) entra em todo mês futuro, sem contar 2x', () => {
+  const transacoes = [
+    ...rendaEAluguel(),
+    criarTransacao({ id: 'c1', valor: 140, data: '2026-08-10', descricao: 'Cartão Nubank' }),
+    criarTransacao({ id: 'c2', valor: 160, data: '2026-09-10', descricao: 'Cartão Nubank' }),
+    criarTransacao({ id: 'm', valor: 500, data: '2026-09-03', descricao: 'Mercado' }),
+  ];
+  const estimativa = estimarGastosFuturos(transacoes, MES_ATUAL);
+
+  const [outubro] = calcularSaldoProjetado(transacoes, [], '2026-10', 1, 0, 0, estimativa);
+
+  // Aluguel 2000 + variável (só o mercado) 500 + cartão médio 150.
+  expect(outubro.saidas).toBe(2650);
+});
+
+test('com estimativa: recorrente na prática NÃO soma no mês em que o lançamento real já existe', () => {
+  const transacoes = [
+    ...rendaEAluguel(),
+    criarTransacao({ id: 'c1', valor: 140, data: '2026-08-10', descricao: 'Cartão Nubank' }),
+    criarTransacao({ id: 'c2', valor: 160, data: '2026-09-10', descricao: 'Cartão Nubank' }),
+    // Já lançou a fatura de outubro antes do tempo.
+    criarTransacao({ id: 'c3', valor: 170, data: '2026-10-10', descricao: 'Cartão Nubank' }),
+  ];
+  const estimativa = estimarGastosFuturos(transacoes, MES_ATUAL);
+
+  const [outubro] = calcularSaldoProjetado(transacoes, [], '2026-10', 1, 0, 0, estimativa);
+
+  // Aluguel 2000 + a fatura REAL de 170 (não 170 + 150 médio).
+  expect(outubro.saidas).toBe(2170);
+});
+
+test('CASO REAL: a mesma meta não muda de veredito só porque começa no mês que vem', () => {
+  const transacoes: Transacao[] = [
+    criarTransacao({ id: 'r1', tipo: 'receita', frequencia: 'mensal', valor: 3200, data: '2026-09-05', descricao: 'Salario Beca' }),
+    criarTransacao({ id: 'r2', tipo: 'receita', frequencia: 'mensal', valor: 2560, data: '2026-09-05', descricao: 'Salario Gui' }),
+    criarTransacao({ id: 'f1', frequencia: 'mensal', valor: 2593.4, data: '2026-01-10', descricao: 'Fixos do mês' }),
+    criarTransacao({ id: 'v1', valor: 1320, data: '2026-09-10', descricao: 'Cartao Mercado Pago' }),
+    criarTransacao({ id: 'v2', valor: 922, data: '2026-09-10', descricao: 'Cartao Caixa' }),
+    criarTransacao({ id: 'v3', valor: 300, data: '2026-09-10', descricao: 'Cartao Itau' }),
+    criarTransacao({ id: 'v4', valor: 140, data: '2026-09-10', descricao: 'Cartao Nubank' }),
+    criarTransacao({ id: 'v5', valor: 108, data: '2026-09-10', descricao: 'Outros' }),
+  ];
+  const estimativa = estimarGastosFuturos(transacoes, MES_ATUAL);
+  const meta = (dataInicio: string) =>
+    criarSimulacao({ tipo: 'economia', valorTotal: 6000, parcelas: 12, dataInicio });
+
+  const esteMes = avaliarViabilidadeSimulacao(meta('2026-09-21'), transacoes, 0, 0, estimativa);
+  const mesQueVem = avaliarViabilidadeSimulacao(meta('2026-10-01'), transacoes, 0, 0, estimativa);
+  const antigaMesQueVem = avaliarViabilidadeSimulacao(meta('2026-10-01'), transacoes, 0, 0);
+
+  expect(esteMes.viavel).toBe(false);
+  expect(mesQueVem.viavel).toBe(false);
+  // O primeiro mês de cada janela sai igual: -123,40 (5760 - 2593,40 - 2790 - 500).
+  expect(esteMes.meses[0].saldo).toBeCloseTo(-123.4, 2);
+  expect(mesQueVem.meses[0].saldo).toBeCloseTo(-123.4, 2);
+  // A regra antiga dava "viável" pro mesmo cenário (variável = 0 em outubro).
+  expect(antigaMesQueVem.viavel).toBe(true);
+});
+
+test('calcularRendaEsperadaDoMes: recorrente + estimativa quando não há avulsa no mês', () => {
+  const transacoes = [
+    criarTransacao({ id: 'r', tipo: 'receita', frequencia: 'mensal', valor: 300, data: '2026-01-05' }),
+  ];
+  // 300 do benefício fixo + 3000 estimados (nenhuma receita avulsa em outubro).
+  expect(calcularRendaEsperadaDoMes(transacoes, '2026-10', 3000)).toBe(3300);
+});
+
+test('calcularRendaEsperadaDoMes: com receita avulsa no mês, a estimativa não é somada', () => {
+  const transacoes = [
+    criarTransacao({ id: 'r', tipo: 'receita', frequencia: 'unica', valor: 3000, data: '2026-10-05' }),
+  ];
+  expect(calcularRendaEsperadaDoMes(transacoes, '2026-10', 3000)).toBe(3000);
+});
+
+test('obterSaldoAtual: saldo informado à noite (22h locais) não esconde os lançamentos do dia seguinte', () => {
+  // 20/09 às 22h em Brasília = 21/09 01:00 em UTC. O checkpoint vale como dia 20,
+  // então uma despesa de 21/09 acontece DEPOIS dele e precisa ser descontada.
+  const saldos: SaldoInicial[] = [{ id: '1', valor: 1000, criadoEm: '2026-09-21T01:00:00.000Z' }];
+  const despesaDeAmanha = criarTransacao({ valor: 100, data: '2026-09-21', tipo: 'despesa' });
+
+  expect(obterSaldoAtual(saldos, [despesaDeAmanha], '2026-09-21')).toBe(900);
 });

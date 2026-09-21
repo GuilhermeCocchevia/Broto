@@ -37,6 +37,7 @@ import {
 import { formatarReal } from '../utils/formatarReal';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import type { TipoSimulacao } from '../types/models';
+import { hojeLocal } from '../utils/dataLocal';
 
 // A CATEGORIA da simulação é sempre do tipo despesa, não importa o `tipo`
 // da simulação em si (compra ou economia) — as duas são "compromisso de
@@ -136,7 +137,7 @@ export default function NovaSimulacaoScreen() {
   // (mesmo padrão de `dataInicio` logo abaixo) só porque o seletor nativo
   // sempre precisa de uma data válida pra abrir — a pessoa troca pelo
   // vencimento real que quiser antes de salvar.
-  const [dataAlvoTexto, setDataAlvoTexto] = useState(new Date().toISOString().slice(0, 10));
+  const [dataAlvoTexto, setDataAlvoTexto] = useState(hojeLocal());
   // Digitado como PORCENTAGEM (ex: "2,5" = 2,5% ao mês) — mais natural de
   // digitar do que a fração (0,025) que é como fica guardado de verdade.
   // Vazio = sem juros, mesmo comportamento de quando esse campo não existia.
@@ -153,7 +154,7 @@ export default function NovaSimulacaoScreen() {
   // na simulação — opcional, sempre some 0 se deixado em branco (ver
   // comentário no tipo Simulacao, em models.ts).
   const [aporteInicial, setAporteInicial] = useState(ehSugestaoDeSobra ? aporteInicialSugerido : 0);
-  const [dataInicio, setDataInicio] = useState(new Date().toISOString().slice(0, 10));
+  const [dataInicio, setDataInicio] = useState(hojeLocal());
   const [categoriaTexto, setCategoriaTexto] = useState(ehSugestaoDeSobra ? CATEGORIA_SUGESTAO : '');
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -190,7 +191,7 @@ export default function NovaSimulacaoScreen() {
 
   function trocarTipo(novoTipo: TipoSimulacao) {
     if (novoTipo === tipo) return;
-    const hoje = new Date().toISOString().slice(0, 10);
+    const hoje = hojeLocal();
     rascunhos.current = guardarRascunho(rascunhos.current, tipo, {
       descricao,
       valor,

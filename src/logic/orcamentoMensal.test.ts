@@ -1,5 +1,6 @@
 import {
   calcularDespesasTotaisDoMes,
+  calcularDespesasFixasDoMes,
   listarDespesasDoMesPorValor,
   temMetaDeEconomiaAtiva,
   avaliarOrcamento,
@@ -185,4 +186,16 @@ test('listarDespesasDoMesPorValor não muta o array original', () => {
   listarDespesasDoMesPorValor(transacoes, '2026-03');
 
   expect(transacoes.map((t) => t.id)).toEqual(['a', 'b']);
+});
+
+test('calcularDespesasFixasDoMes: só as mensais ativas no mês (sem avulsas, sem receitas, sem encerradas)', () => {
+  const transacoes = [
+    criarTransacao({ id: 'aluguel', valor: 1800, frequencia: 'mensal', data: '2026-01-05' }),
+    criarTransacao({ id: 'luz', valor: 119, frequencia: 'mensal', data: '2026-01-15' }),
+    criarTransacao({ id: 'avulsa', valor: 900, frequencia: 'unica', data: '2026-03-10' }),
+    criarTransacao({ id: 'salario', valor: 5000, tipo: 'receita', frequencia: 'mensal', data: '2026-01-01' }),
+    criarTransacao({ id: 'encerrada', valor: 800, frequencia: 'mensal', data: '2026-01-01', dataFim: '2026-02-01' }),
+  ];
+
+  expect(calcularDespesasFixasDoMes(transacoes, '2026-03')).toBe(1919);
 });

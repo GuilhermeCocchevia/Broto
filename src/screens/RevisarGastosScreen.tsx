@@ -13,6 +13,7 @@ import { listarDespesasDoMesPorValor } from '../logic/orcamentoMensal';
 import { formatarReal } from '../utils/formatarReal';
 import { corDaDespesa } from '../utils/corPorValor';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { mesAtualLocal } from '../utils/dataLocal';
 
 // "Rever gastos": um extrato só com as despesas do mês, da mais cara pra
 // mais barata — o ponto de partida natural pra quem precisa cortar gasto
@@ -39,7 +40,7 @@ export default function RevisarGastosScreen() {
     carregarTransacoes();
   }, [carregarCategorias, carregarTransacoes]);
 
-  const mesAtual = useMemo(() => new Date().toISOString().slice(0, 7), []);
+  const mesAtual = useMemo(() => mesAtualLocal(), []);
   const despesas = useMemo(() => listarDespesasDoMesPorValor(transacoes, mesAtual), [transacoes, mesAtual]);
   const totalDoMes = useMemo(() => despesas.reduce((soma, t) => soma + t.valor, 0), [despesas]);
 

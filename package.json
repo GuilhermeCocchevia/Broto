@@ -52,7 +52,8 @@
     "postinstall": "node scripts/corrigir-dependencias-nativas.js"
   },
   "jest": {
-    "preset": "jest-expo"
+    "preset": "jest-expo",
+    "globalSetup": "./jest.global-setup.js"
   },
   "allowScripts": {
     "esbuild@0.18.20": true,

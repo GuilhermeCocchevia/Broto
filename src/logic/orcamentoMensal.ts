@@ -36,6 +36,15 @@ export function calcularDespesasTotaisDoMes(transacoes: Transacao[], mes: string
     .reduce((total, t) => total + t.valor, 0);
 }
 
+// Só as despesas FIXAS (recorrentes, 'mensal') que valem num mês — o
+// "compromisso" mensal, sem o gasto do dia a dia. Usada nas premissas da
+// projeção ("suas despesas fixas somam R$X por mês").
+export function calcularDespesasFixasDoMes(transacoes: Transacao[], mes: string): number {
+  return transacoes
+    .filter((t) => t.tipo === 'despesa' && t.frequencia === 'mensal' && transacaoSeAplicaNoMes(t, mes))
+    .reduce((total, t) => total + t.valor, 0);
+}
+
 // As despesas de um mês (fixas OU avulsas) da mais cara pra mais barata —
 // a lista da tela "Rever gastos". Só as do mês de referência (não o
 // histórico inteiro): é o que pesa no orçamento mensal, e uma compra avulsa

@@ -8,7 +8,7 @@ import { GraficoSaldo } from './GraficoSaldo';
 import { LinhaMesProjetado } from './LinhaMesProjetado';
 import { corDoSaldo } from '../utils/corPorValor';
 import { calcularMesesDeGastoCobertos } from '../logic/saudeFinanceira';
-import type { ResultadoViabilidade } from '../logic/projecao';
+import type { MesProjetado, ResultadoViabilidade } from '../logic/projecao';
 
 // O bloco "veredito + gráfico + tabela" — compartilhado entre a tela de
 // detalhe de UMA simulação (DetalheSimulacaoScreen) e a de avaliação
@@ -23,6 +23,8 @@ export function PainelViabilidade({
   mensagemViavel,
   mensagemNaoViavel,
   acaoAposVeredito,
+  aposGrafico,
+  mesesPesado,
 }: {
   resultado: ResultadoViabilidade;
   saldoAtual: number;
@@ -33,6 +35,12 @@ export function PainelViabilidade({
   // mensagem que a motivou, sem empurrar o gráfico pra baixo com um cartão
   // à parte.
   acaoAposVeredito?: ReactNode;
+  // Blocos entre o gráfico e a tabela ("E se eu gastar menos?" e "Como
+  // calculei") — o que explica e permite mexer no que está no gráfico fica
+  // junto dele.
+  aposGrafico?: ReactNode;
+  // Cenário mais pesado, desenhado como linha tracejada no gráfico.
+  mesesPesado?: MesProjetado[];
 }) {
   // Toque no corpo confirma o veredito mesmo sem olhar pra tela — mesmo
   // padrão de "reforçar pelo toque" usado em salvar/excluir no resto do
@@ -86,7 +94,9 @@ export function PainelViabilidade({
         {acaoAposVeredito}
       </View>
 
-      <GraficoSaldo saldoAtual={saldoAtual} meses={resultado.meses} />
+      <GraficoSaldo saldoAtual={saldoAtual} meses={resultado.meses} mesesPesado={mesesPesado} />
+
+      {aposGrafico}
 
       <View style={styles.lista}>
         {resultado.meses.map((item) => (

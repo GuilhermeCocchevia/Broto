@@ -8,17 +8,21 @@ import { BrilhoCeu } from '../components/CenaGameficada';
 import { PainelViabilidade } from '../components/PainelViabilidade';
 import { BotaoPrimario } from '../components/BotaoPrimario';
 import { BotaoRevisarGastos } from '../components/BotaoRevisarGastos';
+import { PremissasDaProjecao } from '../components/PremissasDaProjecao';
+import { EseSeCard } from '../components/EseSeCard';
+import { usePremissasDeProjecao } from '../hooks/usePremissasDeProjecao';
+import { useCenarios } from '../hooks/useCenarios';
+import {
+  montarAvisoDeFolga,
+  sugestaoParaMetaDeGuardar,
+  temFaixaDeCenarios,
+  type Avaliador,
+} from '../logic/cenariosDeProjecao';
 import { useCategoriasStore } from '../store/useCategoriasStore';
 import { useTransacoesStore } from '../store/useTransacoesStore';
 import { useSimulacoesStore } from '../store/useSimulacoesStore';
 import { useSaldoInicialStore } from '../store/useSaldoInicialStore';
-import {
-  avaliarViabilidadeSimulacao,
-  calcularRendaFixaMedia,
-  calcularParcelaEfetiva,
-  calcularReducaoMensalNecessaria,
-  obterSaldoAtual,
-} from '../logic/projecao';
+import { avaliarViabilidadeSimulacao, calcularParcelaEfetiva } from '../logic/projecao';
 import { calcularValorFuturoLiquido } from '../logic/custosRendaFixa';
 import { formatarReal } from '../utils/formatarReal';
 import { useCategoriaPorId } from '../hooks/useCategoriaPorId';
@@ -42,7 +46,6 @@ export default function DetalheSimulacaoScreen() {
   const carregarTransacoes = useTransacoesStore((state) => state.carregar);
   const simulacoes = useSimulacoesStore((state) => state.simulacoes);
   const carregarSimulacoes = useSimulacoesStore((state) => state.carregar);
-  const saldosIniciais = useSaldoInicialStore((state) => state.saldosIniciais);
   const carregarSaldoInicial = useSaldoInicialStore((state) => state.carregar);
   const categoriaPorId = useCategoriaPorId();
 
@@ -59,24 +62,25 @@ export default function DetalheSimulacaoScreen() {
     navigation.setOptions({ title: simulacao?.descricao ?? 'Simulação' });
   }, [navigation, simulacao?.descricao]);
 
-  const saldoAtual = useMemo(
-    () => obterSaldoAtual(saldosIniciais, transacoes),
-    [saldosIniciais, transacoes],
-  );
-  const rendaFixaMensal = useMemo(() => calcularRendaFixaMedia(transacoes), [transacoes]);
+  // Saldo atual, renda esperada e estimativa de gastos — montados num lugar
+  // só (ver premissasDeProjecao.ts), os mesmos que a avaliação conjunta usa.
+  const premissas = usePremissasDeProjecao();
+  const { saldoAtual, rendaFixaMensal, estimativa } = premissas;
 
-  // Só calcula de verdade se a simulação ainda existir (pode ter sido
-  // excluída em outra tela/aba enquanto essa estava aberta). A projeção
-  // (calcularSaldoProjetado, chamada por dentro de avaliarViabilidadeSimulacao)
-  // já estima sozinha um gasto variável pros meses futuros, baseada no
-  // próprio mês em que a simulação começa — ver comentário completo em
-  // projecao.ts.
-  const resultado = useMemo(() => {
+  // Só avalia de verdade se a simulação ainda existir (pode ter sido excluída
+  // em outra tela/aba enquanto essa estava aberta). `useCenarios` avalia o que
+  // o app assume (base), o "e se" escolhido pelo usuário (esperado) e o
+  // cenário com 20% a mais de gasto (pesado, a linha tracejada) — ver
+  // cenariosDeProjecao.ts.
+  const avaliar = useMemo<Avaliador | null>(() => {
     if (!simulacao) return null;
-    return avaliarViabilidadeSimulacao(simulacao, transacoes, saldoAtual, rendaFixaMensal);
+    return (estimativaAvaliada) =>
+      avaliarViabilidadeSimulacao(simulacao, transacoes, saldoAtual, rendaFixaMensal, estimativaAvaliada);
   }, [simulacao, transacoes, saldoAtual, rendaFixaMensal]);
+  const { cenarios, reducaoPct, setReducaoPct } = useCenarios(estimativa, avaliar);
+  const resultado = cenarios?.esperado ?? null;
 
-  if (!simulacao || !resultado) {
+  if (!simulacao || !cenarios || !resultado) {
     return (
       <View style={styles.wrapper}>
         <BrilhoCeu />
@@ -114,19 +118,38 @@ export default function DetalheSimulacaoScreen() {
         ? `Meta de economia · guarde ${formatarReal(valorDaParcela)}/mês por ${simulacao.parcelas} meses, a partir de ${simulacao.dataInicio}`
         : `Compra parcelada · ${simulacao.parcelas}x de ${formatarReal(valorDaParcela)}, a partir de ${simulacao.dataInicio}`;
 
-  const mensagemViavel = ehModalidadeDeRendimento
+  // Meta de economia/investimento: o valor guardado é o OBJETIVO, então
+  // sugerir "guarde menos" contradiz o que o usuário quer — o que sobra pra
+  // ajustar são as despesas (ou o começo da meta, quando o mês atual já
+  // fechou no negativo). Só compra continua sugerindo mexer na própria
+  // simulação (valor, parcelas, esperar).
+  const ehMetaDeGuardar = ehEconomia || ehModalidadeDeRendimento;
+  const sugestao =
+    !cenarios.base.viavel && ehMetaDeGuardar
+      ? sugestaoParaMetaDeGuardar({
+          base: cenarios.base,
+          corteNecessario: cenarios.corteNecessario,
+          motivoSemSolucao: cenarios.motivoSemSolucao,
+        })
+      : { texto: '', reducaoMensal: 0 };
+  const reducaoMensal = sugestao.reducaoMensal;
+
+  // Com um corte do "e se" escolhido, o veredito descreve ESSE cenário.
+  const comEseSe = reducaoPct > 0 ? `Com ${reducaoPct}% a menos no dia a dia, ` : '';
+  const minuscula = (texto: string) => texto.charAt(0).toLowerCase() + texto.slice(1);
+  const avisoDeFolga = montarAvisoDeFolga(cenarios.esperado, cenarios.pesado);
+
+  const mensagemViavelBase = ehModalidadeDeRendimento
     ? 'Dá pra guardar esse valor sem faltar dinheiro pro resto das suas contas.'
     : ehEconomia
       ? 'Dá pra bater essa meta sem faltar dinheiro pro resto das suas contas.'
       : 'Cabe no seu orçamento — seu saldo não fica negativo enquanto essa compra dura.';
-  // Meta de economia/investimento: o valor guardado é o OBJETIVO, então
-  // sugerir "guarde menos" contradiz o que o usuário quer — o que sobra pra
-  // ajustar são as despesas. Só compra continua sugerindo mexer na própria
-  // simulação (valor, parcelas, esperar).
-  const ehMetaDeGuardar = ehEconomia || ehModalidadeDeRendimento;
-  const reducaoMensal = !resultado.viavel && ehMetaDeGuardar ? calcularReducaoMensalNecessaria(resultado.meses) : 0;
+  const mensagemViavel =
+    (comEseSe ? `${comEseSe}${minuscula(mensagemViavelBase)}` : mensagemViavelBase) +
+    (avisoDeFolga ? ` ${avisoDeFolga}` : '');
+
   const mensagemNaoViavel = ehMetaDeGuardar
-    ? `Guardando esse valor, seu saldo fica negativo em ${resultado.piorMes} (ficaria em ${formatarReal(resultado.piorSaldo)}). Pra manter essa meta, o caminho é gastar menos: cerca de ${formatarReal(reducaoMensal)} a menos por mês resolve.`
+    ? `${reducaoPct > 0 ? `Mesmo com ${reducaoPct}% a menos no dia a dia, seu` : 'Guardando esse valor, seu'} saldo fica negativo em ${resultado.piorMes} (ficaria em ${formatarReal(resultado.piorSaldo)}).${reducaoPct === 0 && sugestao.texto ? ` ${sugestao.texto}` : ''}`
     : `Essa compra deixaria seu saldo negativo em ${resultado.piorMes} (ficaria em ${formatarReal(resultado.piorSaldo)}). Talvez valha ajustar o valor, o número de parcelas, ou esperar um pouco.`;
 
   // Só existe (e só faz sentido mostrar) quando há taxa de rendimento OU
@@ -167,6 +190,18 @@ export default function DetalheSimulacaoScreen() {
           mensagemViavel={mensagemViavel}
           mensagemNaoViavel={mensagemNaoViavel}
           acaoAposVeredito={reducaoMensal > 0 ? <BotaoRevisarGastos reducaoMensal={reducaoMensal} /> : undefined}
+          mesesPesado={temFaixaDeCenarios(cenarios.esperado, cenarios.pesado) ? cenarios.pesado.meses : undefined}
+          aposGrafico={
+            <>
+              <EseSeCard
+                cenarios={cenarios}
+                reducaoPct={reducaoPct}
+                onChange={setReducaoPct}
+                gastoDoDiaADia={premissas.gastoDoDiaADia}
+              />
+              <PremissasDaProjecao premissas={premissas} />
+            </>
+          }
         />
 
         {resultadoLiquido !== null && (

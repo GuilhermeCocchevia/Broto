@@ -14,6 +14,7 @@ import {
 } from '../logic/saudeFinanceira';
 import { formatarReal } from '../utils/formatarReal';
 import { useCategoriaPorId } from '../hooks/useCategoriaPorId';
+import { mesAtualLocal } from '../utils/dataLocal';
 
 // Tela de "saúde financeira" do mês — de propósito separada do Dashboard.
 // O Dashboard existe pra responder "quanto eu tenho agora" com um número só,
@@ -41,7 +42,7 @@ export default function ResumoScreen() {
   }, [carregarCategorias, carregarTransacoes]);
 
   // Mês corrente, mesma convenção (ISO/UTC) já usada em SimuladorScreen.
-  const mesAtual = useMemo(() => new Date().toISOString().slice(0, 7), []);
+  const mesAtual = useMemo(() => mesAtualLocal(), []);
 
   const gastoPorCategoria = useMemo(
     () => calcularGastoPorCategoria(transacoes, mesAtual),

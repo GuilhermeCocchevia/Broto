@@ -14,7 +14,7 @@ import { useTransacoesStore } from '../store/useTransacoesStore';
 import {
   calcularParcelaEfetiva,
   calcularRendaFixaMedia,
-  calcularSaldoProjetado,
+  calcularRendaEsperadaDoMes,
   obterSaldoAtual,
 } from '../logic/projecao';
 import { calcularDespesasTotaisDoMes } from '../logic/orcamentoMensal';
@@ -25,6 +25,7 @@ import { ItemLista } from '../components/ItemLista';
 import { BotaoPrimario } from '../components/BotaoPrimario';
 import { useCategoriaPorId } from '../hooks/useCategoriaPorId';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { mesAtualLocal } from '../utils/dataLocal';
 
 // Altura (em px) da faixa mais escura que sobra embaixo do botão "de pé" no
 // aviso de sobra — mesma técnica "de botão de jogo pixel" do resto do app
@@ -74,7 +75,7 @@ export default function SimuladorScreen() {
   // sobra pra um valor que não existia de verdade — mesmo erro de
   // raciocínio já corrigido na projeção do Simulador (ver
   // calcularSaldoProjetado em projecao.ts).
-  const mesAtual = useMemo(() => new Date().toISOString().slice(0, 7), []);
+  const mesAtual = useMemo(() => mesAtualLocal(), []);
   const rendaFixaMensal = useMemo(() => calcularRendaFixaMedia(transacoes), [transacoes]);
   // A renda esperada do mês não é só `rendaFixaMensal` (essa é só a
   // estimativa a partir de receitas AVULSAS passadas, pensada pra preencher
@@ -85,7 +86,7 @@ export default function SimuladorScreen() {
   // mês do jeito EXATO que o resto do app já projeta — sem duplicar essa
   // soma numa lógica separada aqui.
   const rendaMensalEsperada = useMemo(
-    () => calcularSaldoProjetado(transacoes, [], mesAtual, 1, 0, rendaFixaMensal)[0].entradas,
+    () => calcularRendaEsperadaDoMes(transacoes, mesAtual, rendaFixaMensal),
     [transacoes, mesAtual, rendaFixaMensal],
   );
   const despesasDoMes = useMemo(

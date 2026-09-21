@@ -4,6 +4,7 @@ import { colors } from '../theme/colors';
 import { formatarReal } from '../utils/formatarReal';
 import { corDoSaldo } from '../utils/corPorValor';
 import { calcularEscalaDoGrafico } from '../utils/escalaGrafico';
+import { FATOR_IMPREVISTOS } from '../logic/cenariosDeProjecao';
 import { calcularMesesDeGastoCobertos } from '../logic/saudeFinanceira';
 import type { MesProjetado } from '../logic/projecao';
 
@@ -43,17 +44,26 @@ const PROPORCAO_MAXIMA_NEGATIVA = 1.5;
 export function GraficoSaldo({
   saldoAtual,
   meses,
+  mesesPesado,
 }: {
   saldoAtual: number;
   meses: MesProjetado[];
+  // Cenário "mais pesado" (ver cenariosDeProjecao.ts), desenhado como uma
+  // segunda linha tracejada — a faixa entre o esperado e o pior razoável.
+  // Ausente = só a linha esperada.
+  mesesPesado?: MesProjetado[];
 }) {
   const valoresReais = [saldoAtual, ...meses.map((mes) => mes.saldo)];
+  // O eixo precisa caber as DUAS linhas, senão a tracejada sairia do quadro.
+  const valoresDaEscala = mesesPesado
+    ? [...valoresReais, ...mesesPesado.map((mes) => mes.saldo)]
+    : valoresReais;
   // Escala vertical (até onde o eixo vai pra cima e pra baixo, e a altura da
   // parte acima do zero) — ver calcularEscalaDoGrafico pro raciocínio
   // completo, inclusive o caso "nenhum saldo positivo" (que antes deixava um
   // vazio grande acima da linha) e o teto de profundidade pra dívida funda
   // não virar um paredão.
-  const escala = calcularEscalaDoGrafico(valoresReais, ALTURA_GRAFICO, PROPORCAO_MAXIMA_NEGATIVA);
+  const escala = calcularEscalaDoGrafico(valoresDaEscala, ALTURA_GRAFICO, PROPORCAO_MAXIMA_NEGATIVA);
   const menorValorPermitido = escala.mostNegativeValue;
 
   // Referência ABSOLUTA pra cor (ver corDoSaldo em corPorValor.ts): a média
@@ -88,6 +98,15 @@ export function GraficoSaldo({
       dataPointColor: corPorSaldo(mes.saldo),
     })),
   ];
+
+  // Pontos da linha tracejada: o mesmo "Hoje" e um por mês, achatados no
+  // mesmo piso do eixo (o valor exato só existe na tabela).
+  const pontosPesado = mesesPesado
+    ? [
+        { value: saldoAtual },
+        ...mesesPesado.map((mes) => ({ value: Math.max(mes.saldo, menorValorPermitido) })),
+      ]
+    : undefined;
 
   // A LINHA (não só os pontos) também muda de cor conforme a "saúde" do
   // saldo — cada segmento pega a cor do ponto em que ele TERMINA, então a
@@ -128,6 +147,13 @@ export function GraficoSaldo({
         color={corDoPior}
         lineSegments={segmentosDaLinha}
         thickness={3}
+        // Linha tracejada e discreta do cenário mais pesado (sem pontos, sem
+        // preenchimento) — informação de contexto, não o protagonista.
+        data2={pontosPesado}
+        color2={colors.textMuted}
+        thickness2={2}
+        strokeDashArray2={[6, 6]}
+        hideDataPoints2
         dataPointsRadius={4}
         hideRules
         hideYAxisText
@@ -160,11 +186,21 @@ export function GraficoSaldo({
           ),
         }}
       />
+      {pontosPesado && (
+        <Text style={styles.legenda}>
+          Linha tracejada: se o gasto do dia a dia custar {Math.round((FATOR_IMPREVISTOS - 1) * 100)}% a mais.
+        </Text>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  legenda: {
+    marginTop: 4,
+    fontSize: 12,
+    color: colors.textMuted,
+  },
   // Sem `marginTop` próprio agora — o espaçamento em relação ao que vem
   // antes (o botão "+ nova simulação") é controlado pelo `gap` do
   // container pai (ver SimuladorScreen.tsx), pra não empilhar dois

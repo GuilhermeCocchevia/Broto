@@ -14,6 +14,7 @@ import { useSaldoInicialStore } from '../store/useSaldoInicialStore';
 import { montarBackup, lerBackup } from '../logic/backup';
 import { restaurarBackup } from '../db/restaurarBackup';
 import { mensagemDeErro } from '../utils/mensagemDeErro';
+import { hojeLocal } from '../utils/dataLocal';
 
 // Backup manual: exportar gera um arquivo .json e abre a folha de
 // compartilhamento nativa do sistema — o usuário escolhe pra onde mandar
@@ -212,7 +213,7 @@ export default function BackupScreen() {
 // 'AAAA-MM-DD' de hoje, só pra dar um nome de arquivo legível — o mesmo
 // formato de data já usado em todo o resto do app.
 function dataDeHoje(): string {
-  return new Date().toISOString().slice(0, 10);
+  return hojeLocal();
 }
 
 const styles = StyleSheet.create({

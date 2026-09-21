@@ -22,6 +22,7 @@ import { mensagemDeErro } from '../utils/mensagemDeErro';
 import { escolherCorAutomatica, encontrarCategoriaPorNome } from '../utils/resolverOuCriarCategoria';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import type { TipoTransacao, Frequencia } from '../types/models';
+import { hojeLocal } from '../utils/dataLocal';
 
 // Formulário genérico de lançamento — serve tanto pra registrar um salário já
 // recebido (receita, avulsa, com data no passado) quanto uma despesa comum, ou
@@ -43,7 +44,7 @@ export default function NovaTransacaoScreen() {
 
   const [descricao, setDescricao] = useState('');
   const [valor, setValor] = useState(0);
-  const [data, setData] = useState(new Date().toISOString().slice(0, 10));
+  const [data, setData] = useState(hojeLocal());
   const [tipo, setTipo] = useState<TipoTransacao>('despesa');
   const [frequencia, setFrequencia] = useState<Frequencia>('unica');
   // Texto vazio = "repete pra sempre" (vira `dataFim: null` ao salvar). Só é

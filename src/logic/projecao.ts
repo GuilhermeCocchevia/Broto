@@ -4,6 +4,9 @@
 // pura é muito mais fácil de testar (ver projecao.test.ts) do que lógica
 // misturada com tela.
 import type { Transacao, Simulacao, SaldoInicial } from '../types/models';
+import type { EstimativaDeGastos } from './estimativaDeGastos';
+import { normalizarTexto } from '../utils/normalizarTexto';
+import { dataLocalDeTimestamp, hojeLocal } from '../utils/dataLocal';
 
 export type MesProjetado = {
   // Formato 'AAAA-MM', ex: '2026-09'.
@@ -241,7 +244,7 @@ export function obterSaldoAtual(
   // pura e fácil de testar — mesmo raciocínio de calcularSaldoProjetado receber
   // `mesInicial` de fora. Mesma convenção de fuso (ISO/UTC) já usada em
   // SimuladorScreen pro "mês atual".
-  hoje: string = new Date().toISOString().slice(0, 10),
+  hoje: string = hojeLocal(),
 ): number {
   if (saldosIniciais.length === 0) {
     return 0;
@@ -254,7 +257,10 @@ export function obterSaldoAtual(
   // O saldo informado já reflete tudo até o dia em que foi cadastrado — só
   // contamos o impacto do que aconteceu DEPOIS dessa data, pra não somar de
   // novo algo que o próprio valor informado já carrega embutido.
-  const dataReferencia = maisRecente.criadoEm.slice(0, 10);
+  // `criadoEm` é um timestamp em UTC; a data que interessa é a do dia em que a
+  // pessoa informou o saldo, no fuso dela — senão um saldo informado à noite
+  // "empurrava" o checkpoint pro dia seguinte e escondia os lançamentos dele.
+  const dataReferencia = dataLocalDeTimestamp(maisRecente.criadoEm);
 
   const impacto = transacoes.reduce((total, transacao) => {
     const sinal = transacao.tipo === 'receita' ? 1 : -1;
@@ -372,6 +378,13 @@ export function calcularSaldoProjetado(
   // resultado de calcularRendaFixaMedia). Fica de fora do saldo dos meses
   // passados/atuais reais porque essa é só uma estimativa pro futuro.
   rendaFixaMensal: number = 0,
+  // Estimativa de gastos avulsos (ver estimarGastosFuturos). Com ela, a
+  // referência é o mês ATUAL e o histórico recente, não importa quando a
+  // simulação começa — corrige o caso em que uma simulação começando num
+  // mês futuro herdava R$0 de gasto variável (o mês ainda não tem lançamento
+  // nenhum) e ficava viável no papel. Sem ela (padrão), vale a regra antiga
+  // ancorada em `mesInicial`, descrita logo abaixo.
+  estimativa?: EstimativaDeGastos,
 ): MesProjetado[] {
   const resultado: MesProjetado[] = [];
   let saldoAcumulado = saldoInicial;
@@ -390,7 +403,8 @@ export function calcularSaldoProjetado(
   // Sem isso, todo mês futuro sem despesa avulsa própria assumia
   // silenciosamente "só despesa fixa daqui pra frente", inflando a
   // viabilidade de qualquer simulação de prazo mais longo.
-  const despesaVariavelMediaMensal = calcularDespesaVariavelMedia(transacoes, mesInicial, 1);
+  const despesaVariavelMediaMensal = estimativa ? 0 : calcularDespesaVariavelMedia(transacoes, mesInicial, 1);
+  const chavesRecorrentes = new Set(estimativa?.recorrentesNaPratica.map((r) => r.chave) ?? []);
 
   for (let i = 0; i < quantidadeMeses; i++) {
     const mes = adicionarMeses(mesInicial, i);
@@ -411,6 +425,11 @@ export function calcularSaldoProjetado(
     // Mesmo raciocínio, espelhado pro lado da despesa avulsa (ver
     // despesaVariavelMediaMensal acima).
     let jaTemDespesaAvulsaRegistradaNesseMes = false;
+    // Só usados com `estimativa`: quanto do gasto avulso REAL do mês é
+    // "variável de verdade" (não recorrente na prática), e quais
+    // recorrentes na prática já têm lançamento real nesse mês.
+    let avulsasVariaveisReaisNoMes = 0;
+    const chavesAvulsasDoMes = new Set<string>();
 
     for (const transacao of transacoes) {
       if (!transacaoSeAplicaNoMes(transacao, mes)) continue;
@@ -424,6 +443,11 @@ export function calcularSaldoProjetado(
         saidas += transacao.valor;
         if (transacao.frequencia === 'unica') {
           jaTemDespesaAvulsaRegistradaNesseMes = true;
+          if (estimativa) {
+            const chave = normalizarTexto(transacao.descricao);
+            chavesAvulsasDoMes.add(chave);
+            if (!chavesRecorrentes.has(chave)) avulsasVariaveisReaisNoMes += transacao.valor;
+          }
         }
       }
     }
@@ -431,7 +455,28 @@ export function calcularSaldoProjetado(
     if (!jaTemReceitaRegistradaNesseMes) {
       entradas += rendaFixaMensal;
     }
-    if (!jaTemDespesaAvulsaRegistradaNesseMes) {
+    if (estimativa) {
+      // Meses ANTERIORES ao atual são histórico: só o que foi lançado.
+      if (mes === estimativa.mesAtual) {
+        // Mês atual: a estimativa já tem como piso o que foi gasto até
+        // agora, então completa só a diferença — o mês inteiro vale a
+        // estimativa, sem contar o já lançado duas vezes.
+        saidas += Math.max(0, estimativa.gastoVariavelMensal - avulsasVariaveisReaisNoMes);
+      } else if (mes > estimativa.mesAtual) {
+        // Mês futuro: o gasto do dia a dia ACONTECE além de qualquer compra
+        // planejada já lançada pra ele, então soma por cima (a regra antiga
+        // zerava a estimativa se houvesse uma avulsa qualquer no mês).
+        saidas += estimativa.gastoVariavelMensal;
+      }
+      // Recorrentes na prática (ex: fatura de cartão lançada como avulsa
+      // todo mês): valem de agora em diante, exceto no mês em que o lançamento
+      // real já existe (o dado real vence a estimativa).
+      if (mes >= estimativa.mesAtual) {
+        for (const recorrente of estimativa.recorrentesNaPratica) {
+          if (!chavesAvulsasDoMes.has(recorrente.chave)) saidas += recorrente.valorMensal;
+        }
+      }
+    } else if (!jaTemDespesaAvulsaRegistradaNesseMes) {
       saidas += despesaVariavelMediaMensal;
     }
 
@@ -451,6 +496,20 @@ export function calcularSaldoProjetado(
   }
 
   return resultado;
+}
+
+// A renda esperada num mês: receitas recorrentes ativas + receitas avulsas
+// lançadas nele, ou, se o mês não tem nenhuma avulsa, a estimativa
+// `rendaFixaMensal` (ver calcularRendaFixaMedia). Reaproveita
+// calcularSaldoProjetado (sem simulação nenhuma) só pelas `entradas` de um mês
+// — a regra "só soma a média se ainda não tem receita avulsa" fica num lugar
+// só. Antes essa mesma conta estava copiada no Dashboard e no Simulador.
+export function calcularRendaEsperadaDoMes(
+  transacoes: Transacao[],
+  mes: string,
+  rendaFixaMensal: number,
+): number {
+  return calcularSaldoProjetado(transacoes, [], mes, 1, 0, rendaFixaMensal)[0].entradas;
 }
 
 // Resultado de avaliar UMA simulação (compra ou meta de economia) contra a
@@ -495,8 +554,9 @@ export function avaliarViabilidadeSimulacao(
   transacoes: Transacao[],
   saldoAtual: number,
   rendaFixaMensal: number,
+  estimativa?: EstimativaDeGastos,
 ): ResultadoViabilidade {
-  return avaliarViabilidadeConjunta([simulacao], transacoes, saldoAtual, rendaFixaMensal);
+  return avaliarViabilidadeConjunta([simulacao], transacoes, saldoAtual, rendaFixaMensal, estimativa);
 }
 
 // Mesma pergunta de avaliarViabilidadeSimulacao, só que pra VÁRIAS
@@ -526,6 +586,7 @@ export function avaliarViabilidadeConjunta(
   transacoes: Transacao[],
   saldoAtual: number,
   rendaFixaMensal: number,
+  estimativa?: EstimativaDeGastos,
 ): ResultadoViabilidade {
   // Sem nenhuma simulação, não tem janela nenhuma pra avaliar — devolve um
   // resultado trivialmente viável (não há função de `.reduce` que funcione
@@ -547,6 +608,7 @@ export function avaliarViabilidadeConjunta(
     quantidadeMeses,
     saldoAtual,
     rendaFixaMensal,
+    estimativa,
   );
 
   // Sempre existe um "pior mês" (mesmo que a janela seja de 1 mês só) — o

@@ -13,7 +13,7 @@ import { useCategoriasStore } from '../store/useCategoriasStore';
 import { useTransacoesStore } from '../store/useTransacoesStore';
 import { useSaldoInicialStore } from '../store/useSaldoInicialStore';
 import { useSimulacoesStore } from '../store/useSimulacoesStore';
-import { obterSaldoAtual, calcularRendaFixaMedia, calcularSaldoProjetado } from '../logic/projecao';
+import { obterSaldoAtual, calcularRendaFixaMedia, calcularRendaEsperadaDoMes } from '../logic/projecao';
 import { calcularParcelasAtivasNoMes } from '../logic/sobraMensal';
 import {
   calcularDespesasTotaisDoMes,
@@ -28,6 +28,7 @@ import { useConfiguracoesStore } from '../store/useConfiguracoesStore';
 import { curiosidadesInvestimento } from '../data/curiosidadesInvestimento';
 import { escolherProximaCuriosidade } from '../logic/curiosidades';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { mesAtualLocal } from '../utils/dataLocal';
 
 // Paleta só desta tela — mais "aterrada" que as cores vivas do resto do
 // app (colors.primary/secondary/etc, ver theme/colors.ts), de propósito:
@@ -117,14 +118,14 @@ export default function DashboardScreen() {
   // qualquer número. Ver comentário completo do porquê da conta em
   // logic/orcamentoMensal.ts.
   const orcamento = useMemo(() => {
-    const mesAtual = new Date().toISOString().slice(0, 7);
+    const mesAtual = mesAtualLocal();
     const rendaFixaMensal = calcularRendaFixaMedia(transacoes);
     // Mesmo truque já usado em SimuladorScreen.tsx pra pegar a renda
     // esperada do mês atual: reaproveita calcularSaldoProjetado (sem
     // nenhuma simulação) só pelas `entradas` do primeiro mês — já resolve
     // sozinho o "só soma a média se ainda não tiver receita avulsa
     // registrada esse mês" (ver o comentário na própria função).
-    const rendaDoMes = calcularSaldoProjetado(transacoes, [], mesAtual, 1, 0, rendaFixaMensal)[0].entradas;
+    const rendaDoMes = calcularRendaEsperadaDoMes(transacoes, mesAtual, rendaFixaMensal);
     const despesasDoMes = calcularDespesasTotaisDoMes(transacoes, mesAtual);
     // O "limite" a proteger não é só a meta de economia — uma compra
     // parcelada ativa é igual de real. calcularParcelasAtivasNoMes soma

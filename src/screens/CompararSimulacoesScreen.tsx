@@ -7,16 +7,20 @@ import { colors } from '../theme/colors';
 import { BrilhoCeu } from '../components/CenaGameficada';
 import { PainelViabilidade } from '../components/PainelViabilidade';
 import { BotaoRevisarGastos } from '../components/BotaoRevisarGastos';
+import { PremissasDaProjecao } from '../components/PremissasDaProjecao';
+import { EseSeCard } from '../components/EseSeCard';
+import { usePremissasDeProjecao } from '../hooks/usePremissasDeProjecao';
+import { useCenarios } from '../hooks/useCenarios';
+import {
+  montarAvisoDeFolga,
+  sugestaoParaMetaDeGuardar,
+  temFaixaDeCenarios,
+  type Avaliador,
+} from '../logic/cenariosDeProjecao';
 import { useTransacoesStore } from '../store/useTransacoesStore';
 import { useSimulacoesStore } from '../store/useSimulacoesStore';
 import { useSaldoInicialStore } from '../store/useSaldoInicialStore';
-import {
-  avaliarViabilidadeConjunta,
-  calcularRendaFixaMedia,
-  calcularParcelaEfetiva,
-  calcularReducaoMensalNecessaria,
-  obterSaldoAtual,
-} from '../logic/projecao';
+import { avaliarViabilidadeConjunta, calcularParcelaEfetiva } from '../logic/projecao';
 import { formatarReal } from '../utils/formatarReal';
 
 // "Dá pra fazer essa compra E bater essa meta de economia ao mesmo tempo,
@@ -29,7 +33,6 @@ export default function CompararSimulacoesScreen() {
   const carregarTransacoes = useTransacoesStore((state) => state.carregar);
   const simulacoes = useSimulacoesStore((state) => state.simulacoes);
   const carregarSimulacoes = useSimulacoesStore((state) => state.carregar);
-  const saldosIniciais = useSaldoInicialStore((state) => state.saldosIniciais);
   const carregarSaldoInicial = useSaldoInicialStore((state) => state.carregar);
 
   const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
@@ -53,45 +56,60 @@ export default function CompararSimulacoesScreen() {
     });
   }
 
-  const saldoAtual = useMemo(
-    () => obterSaldoAtual(saldosIniciais, transacoes),
-    [saldosIniciais, transacoes],
-  );
-  const rendaFixaMensal = useMemo(() => calcularRendaFixaMedia(transacoes), [transacoes]);
+  // Mesmas premissas do detalhe de uma simulação (ver DetalheSimulacaoScreen).
+  const premissas = usePremissasDeProjecao();
+  const { saldoAtual, rendaFixaMensal, estimativa } = premissas;
 
   const simulacoesEscolhidas = useMemo(
     () => simulacoes.filter((s) => selecionadas.has(s.id)),
     [simulacoes, selecionadas],
   );
 
-  // Só calcula (e só mostra o painel) com 2 ou mais escolhidas — com 0 ou 1
+  // Só avalia (e só mostra o painel) com 2 ou mais escolhidas — com 0 ou 1
   // não tem "combinação" nenhuma pra avaliar, é só a tela de detalhe normal.
-  const resultado = useMemo(() => {
+  // Base, "e se" e cenário mais pesado: ver useCenarios/cenariosDeProjecao.ts.
+  const avaliar = useMemo<Avaliador | null>(() => {
     if (simulacoesEscolhidas.length < 2) return null;
-    return avaliarViabilidadeConjunta(simulacoesEscolhidas, transacoes, saldoAtual, rendaFixaMensal);
+    return (estimativaAvaliada) =>
+      avaliarViabilidadeConjunta(simulacoesEscolhidas, transacoes, saldoAtual, rendaFixaMensal, estimativaAvaliada);
   }, [simulacoesEscolhidas, transacoes, saldoAtual, rendaFixaMensal]);
+  const { cenarios, reducaoPct, setReducaoPct } = useCenarios(estimativa, avaliar);
+  const resultado = cenarios?.esperado ?? null;
 
   // Só quando TODAS as escolhidas são metas de guardar (economia,
   // rendimento, aposentadoria) o caminho é gastar menos — se tem uma compra
   // no meio, ainda dá pra ajustar ela, então a mensagem antiga continua
   // valendo (ver o mesmo raciocínio em DetalheSimulacaoScreen).
   const todasSaoMetaDeGuardar = simulacoesEscolhidas.every((s) => s.tipo !== 'compra');
-  const reducaoMensal = useMemo(
-    () => (resultado && !resultado.viavel && todasSaoMetaDeGuardar ? calcularReducaoMensalNecessaria(resultado.meses) : 0),
-    [resultado, todasSaoMetaDeGuardar],
+  const sugestao = useMemo(
+    () =>
+      cenarios && !cenarios.base.viavel && todasSaoMetaDeGuardar
+        ? sugestaoParaMetaDeGuardar({
+            base: cenarios.base,
+            corteNecessario: cenarios.corteNecessario,
+            motivoSemSolucao: cenarios.motivoSemSolucao,
+            plural: true,
+          })
+        : { texto: '', reducaoMensal: 0 },
+    [cenarios, todasSaoMetaDeGuardar],
   );
+  const reducaoMensal = sugestao.reducaoMensal;
 
   const mensagens = useMemo(() => {
-    if (!resultado) return null;
+    if (!resultado || !cenarios) return null;
     const nomes = simulacoesEscolhidas.map((s) => `"${s.descricao}"`).join(' + ');
-    const situacao = `Fazendo ${nomes} ao mesmo tempo, seu saldo fica negativo em ${resultado.piorMes} (ficaria em ${formatarReal(resultado.piorSaldo)}).`;
+    const comEseSe = reducaoPct > 0 ? `Com ${reducaoPct}% a menos no dia a dia, ` : '';
+    const avisoDeFolga = montarAvisoDeFolga(cenarios.esperado, cenarios.pesado);
+    const situacao = `${reducaoPct > 0 ? `${comEseSe}fazendo` : 'Fazendo'} ${nomes} ao mesmo tempo, seu saldo fica negativo em ${resultado.piorMes} (ficaria em ${formatarReal(resultado.piorSaldo)}).`;
     return {
-      viavel: `Dá pra fazer ${nomes} ao mesmo tempo, sem faltar dinheiro pro resto das suas contas.`,
+      viavel:
+        `${comEseSe ? `${comEseSe}dá` : 'Dá'} pra fazer ${nomes} ao mesmo tempo, sem faltar dinheiro pro resto das suas contas.` +
+        (avisoDeFolga ? ` ${avisoDeFolga}` : ''),
       naoViavel: todasSaoMetaDeGuardar
-        ? `${situacao} Pra manter essas metas, o caminho é gastar menos: cerca de ${formatarReal(reducaoMensal)} a menos por mês resolve.`
-        : `${situacao} Talvez valha ajustar alguma delas, ou escalonar no tempo.`,
+        ? `${situacao.charAt(0).toUpperCase()}${situacao.slice(1)}${reducaoPct === 0 && sugestao.texto ? ` ${sugestao.texto}` : ''}`
+        : `${situacao.charAt(0).toUpperCase()}${situacao.slice(1)} Talvez valha ajustar alguma delas, ou escalonar no tempo.`,
     };
-  }, [resultado, simulacoesEscolhidas, todasSaoMetaDeGuardar, reducaoMensal]);
+  }, [resultado, cenarios, reducaoPct, simulacoesEscolhidas, todasSaoMetaDeGuardar, sugestao]);
 
   return (
     <View style={styles.wrapper}>
@@ -159,13 +177,25 @@ export default function CompararSimulacoesScreen() {
           <Text style={styles.aviso}>Escolha mais uma pra comparar juntas.</Text>
         )}
 
-        {resultado && mensagens && (
+        {resultado && cenarios && mensagens && (
           <PainelViabilidade
             resultado={resultado}
             saldoAtual={saldoAtual}
             mensagemViavel={mensagens.viavel}
             mensagemNaoViavel={mensagens.naoViavel}
             acaoAposVeredito={reducaoMensal > 0 ? <BotaoRevisarGastos reducaoMensal={reducaoMensal} /> : undefined}
+            mesesPesado={temFaixaDeCenarios(cenarios.esperado, cenarios.pesado) ? cenarios.pesado.meses : undefined}
+            aposGrafico={
+              <>
+                <EseSeCard
+                  cenarios={cenarios}
+                  reducaoPct={reducaoPct}
+                  onChange={setReducaoPct}
+                  gastoDoDiaADia={premissas.gastoDoDiaADia}
+                />
+                <PremissasDaProjecao premissas={premissas} />
+              </>
+            }
           />
         )}
       </ScrollView>
