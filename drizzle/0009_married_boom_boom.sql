@@ -1,0 +1,1 @@
+ALTER TABLE `configuracoes` ADD `curiosidade_indice` integer;

@@ -1,11 +1,14 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import * as Haptics from 'expo-haptics';
 import { colors } from '../theme/colors';
 import { useSaldoInicialStore } from '../store/useSaldoInicialStore';
 import { OpcaoBotao } from '../components/OpcaoBotao';
-import { parsearValorMonetario } from '../utils/parsearValorMonetario';
+import { CampoMoeda } from '../components/CampoMoeda';
+import { BotaoPrimario } from '../components/BotaoPrimario';
+import { BrilhoCeu } from '../components/CenaGameficada';
 import { mensagemDeErro } from '../utils/mensagemDeErro';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -19,7 +22,7 @@ export default function AtualizarSaldoScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const atualizar = useSaldoInicialStore((state) => state.atualizar);
 
-  const [valorTexto, setValorTexto] = useState('');
+  const [valorAbsoluto, setValorAbsoluto] = useState(0);
   // O teclado numérico do iOS não tem tecla de "-", então saldo negativo
   // (você deve dinheiro) é escolhido aqui, não digitado — o campo de valor
   // sempre guarda um número positivo, e a gente inverte o sinal na hora de
@@ -29,20 +32,15 @@ export default function AtualizarSaldoScreen() {
   const [salvando, setSalvando] = useState(false);
 
   async function salvar() {
-    const valorAbsoluto = parsearValorMonetario(valorTexto);
-
-    if (valorAbsoluto === null || valorAbsoluto < 0) {
-      setErro('Informe um valor válido.');
-      return;
-    }
-
     setErro(null);
     setSalvando(true);
     try {
       const valor = sinal === 'negativo' ? -valorAbsoluto : valorAbsoluto;
       await atualizar(valor);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       navigation.goBack();
     } catch (erroAoSalvar) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setErro(mensagemDeErro(erroAoSalvar, 'salvar'));
     } finally {
       setSalvando(false);
@@ -50,47 +48,46 @@ export default function AtualizarSaldoScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.conteudo}>
-      <Text style={styles.rotulo}>Quanto você tem agora, no total?</Text>
-      <TextInput
-        style={styles.input}
-        value={valorTexto}
-        onChangeText={setValorTexto}
-        placeholder="Ex: 1500"
-        keyboardType="decimal-pad"
-        autoFocus
-      />
+    <View style={styles.wrapper}>
+      <BrilhoCeu />
+      <ScrollView style={styles.container} contentContainerStyle={styles.conteudo}>
+        <Text style={styles.rotulo}>Quanto você tem agora, no total?</Text>
+        <CampoMoeda valor={valorAbsoluto} onChangeValor={setValorAbsoluto} autoFocus />
 
-      <View style={styles.opcoes}>
-        <OpcaoBotao
-          label="Tenho esse valor"
-          selecionado={sinal === 'positivo'}
-          onPress={() => setSinal('positivo')}
-        />
-        <OpcaoBotao
-          label="Estou devendo"
-          selecionado={sinal === 'negativo'}
-          onPress={() => setSinal('negativo')}
-        />
-      </View>
+        <View style={styles.opcoes}>
+          <OpcaoBotao
+            label="Tenho esse valor"
+            selecionado={sinal === 'positivo'}
+            onPress={() => setSinal('positivo')}
+          />
+          <OpcaoBotao
+            label="Estou devendo"
+            selecionado={sinal === 'negativo'}
+            onPress={() => setSinal('negativo')}
+          />
+        </View>
 
-      {erro && <Text style={styles.erro}>{erro}</Text>}
+        {erro && <Text style={styles.erro}>{erro}</Text>}
 
-      <Pressable
-        style={[styles.botaoSalvar, salvando && styles.botaoDesabilitado]}
-        onPress={salvar}
-        disabled={salvando}
-      >
-        <Text style={styles.botaoSalvarTexto}>{salvando ? 'Salvando...' : 'Salvar'}</Text>
-      </Pressable>
-    </ScrollView>
+        <View style={styles.botaoSalvar}>
+          <BotaoPrimario
+            label={salvando ? 'Salvando...' : 'Salvar'}
+            onPress={salvar}
+            desabilitado={salvando}
+          />
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  wrapper: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  container: {
+    flex: 1,
   },
   conteudo: {
     padding: 24,
@@ -100,14 +97,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginTop: 16,
     marginBottom: 8,
-  },
-  input: {
-    backgroundColor: colors.surface,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    color: colors.text,
   },
   opcoes: {
     flexDirection: 'row',
@@ -121,17 +110,5 @@ const styles = StyleSheet.create({
   },
   botaoSalvar: {
     marginTop: 24,
-    backgroundColor: colors.primary,
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  botaoSalvarTexto: {
-    color: colors.surface,
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  botaoDesabilitado: {
-    opacity: 0.6,
   },
 });

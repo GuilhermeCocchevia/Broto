@@ -1,15 +1,23 @@
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
+import * as Haptics from 'expo-haptics';
 import { colors } from '../theme/colors';
 import { useCategoriasStore } from '../store/useCategoriasStore';
 import { useTransacoesStore } from '../store/useTransacoesStore';
 import { OpcaoBotao } from '../components/OpcaoBotao';
 import { CampoCategoria } from '../components/CampoCategoria';
-import { parsearValorMonetario } from '../utils/parsearValorMonetario';
-import { validarData } from '../utils/validarData';
+import { CampoTexto } from '../components/CampoTexto';
+import { CampoMoeda } from '../components/CampoMoeda';
+import { CampoData } from '../components/CampoData';
+import { BotaoPrimario } from '../components/BotaoPrimario';
+import { BrilhoCeu } from '../components/CenaGameficada';
+import {
+  calcularDataFimPorQuantidadeDeMeses,
+  calcularQuantidadeDeMesesPorDataFim,
+} from '../logic/projecao';
 import { mensagemDeErro } from '../utils/mensagemDeErro';
 import { escolherCorAutomatica, encontrarCategoriaPorNome } from '../utils/resolverOuCriarCategoria';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -34,13 +42,19 @@ export default function NovaTransacaoScreen() {
   const remover = useTransacoesStore((state) => state.remover);
 
   const [descricao, setDescricao] = useState('');
-  const [valorTexto, setValorTexto] = useState('');
+  const [valor, setValor] = useState(0);
   const [data, setData] = useState(new Date().toISOString().slice(0, 10));
   const [tipo, setTipo] = useState<TipoTransacao>('despesa');
   const [frequencia, setFrequencia] = useState<Frequencia>('unica');
-  // Texto vazio = "repete pra sempre" (vira `null` ao salvar). Só é usado de
-  // verdade quando frequencia === 'mensal' — ver o campo mais abaixo no JSX.
-  const [dataFimTexto, setDataFimTexto] = useState('');
+  // Texto vazio = "repete pra sempre" (vira `dataFim: null` ao salvar). Só é
+  // usado de verdade quando frequencia === 'mensal' — ver o campo mais
+  // abaixo no JSX. Pedimos "quantos meses" (não uma data final) porque é
+  // assim que a pessoa já pensa numa compra recorrente — associa direto com
+  // a quantidade de parcelas, tipo "financiei em 12x" — bem mais natural do
+  // que calcular de cabeça em qual mês/ano aquilo termina. A conversão pra
+  // data (o que o banco realmente guarda) fica em salvar(), ver
+  // calcularDataFimPorQuantidadeDeMeses em logic/projecao.ts.
+  const [quantidadeMesesTexto, setQuantidadeMesesTexto] = useState('');
   // Nome digitado no campo de categoria — não é mais um id de categoria já
   // escolhida. Resolvido (ou criado, se for nome novo) só na hora de salvar,
   // ver salvar() abaixo. Isso é o que junta "escolher categoria" e "criar
@@ -61,11 +75,18 @@ export default function NovaTransacaoScreen() {
     const transacao = transacoes.find((t) => t.id === idEditando);
     if (transacao) {
       setDescricao(transacao.descricao);
-      setValorTexto(String(transacao.valor));
+      setValor(transacao.valor);
       setData(transacao.data);
       setTipo(transacao.tipo);
       setFrequencia(transacao.frequencia);
-      setDataFimTexto(transacao.dataFim ?? '');
+      // O banco só guarda a data final calculada, não a quantidade de meses
+      // que a pessoa digitou — refaz a conta de trás pra frente só pra
+      // pré-preencher o campo com um número que faça sentido de novo.
+      setQuantidadeMesesTexto(
+        transacao.dataFim
+          ? String(calcularQuantidadeDeMesesPorDataFim(transacao.data, transacao.dataFim))
+          : '',
+      );
       // O campo guarda o NOME da categoria, não o id — então precisa achar
       // a categoria pelo id salvo na transação e pegar o nome dela.
       const categoriaAtual = categorias.find((c) => c.id === transacao.categoriaId);
@@ -76,25 +97,24 @@ export default function NovaTransacaoScreen() {
   // async: só volta pra tela anterior depois de confirmar que gravou de
   // verdade — ver o comentário equivalente em NovaCategoriaScreen.tsx.
   async function salvar() {
-    const valor = parsearValorMonetario(valorTexto);
-
     if (!descricao.trim()) {
       setErro('Preencha a descrição.');
       return;
     }
-    if (valor === null || valor <= 0) {
+    if (valor <= 0) {
       setErro('Informe um valor válido, maior que zero.');
       return;
     }
-    if (!validarData(data)) {
-      setErro('Data inválida. Use o formato AAAA-MM-DD, ex: 2026-09-14.');
-      return;
-    }
-    // dataFim só faz sentido pra transação mensal, e é opcional mesmo assim
-    // (vazio = repete pra sempre) — por isso só valida o formato se o
+    // Quantidade de meses só faz sentido pra transação mensal, e é opcional
+    // mesmo assim (vazio = repete pra sempre) — por isso só valida se o
     // usuário de fato preencheu alguma coisa.
-    if (frequencia === 'mensal' && dataFimTexto.trim() && !validarData(dataFimTexto)) {
-      setErro('Data final inválida. Use o formato AAAA-MM-DD, ou deixe em branco.');
+    const quantidadeMeses = Number(quantidadeMesesTexto);
+    if (
+      frequencia === 'mensal' &&
+      quantidadeMesesTexto.trim() &&
+      (!Number.isInteger(quantidadeMeses) || quantidadeMeses <= 0)
+    ) {
+      setErro('A quantidade de meses precisa ser um número inteiro maior que zero, ou deixe em branco.');
       return;
     }
     if (!categoriaTexto.trim()) {
@@ -125,15 +145,22 @@ export default function NovaTransacaoScreen() {
         tipo,
         categoriaId,
         frequencia,
-        dataFim: frequencia === 'mensal' && dataFimTexto.trim() ? dataFimTexto : null,
+        dataFim:
+          frequencia === 'mensal' && quantidadeMesesTexto.trim()
+            ? calcularDataFimPorQuantidadeDeMeses(data, quantidadeMeses)
+            : null,
       };
       if (idEditando) {
         await atualizar(idEditando, dados);
       } else {
         await adicionar(dados);
       }
+      // Toque de sucesso — confirma pelo "corpo" que gravou, sem precisar
+      // olhar pra tela nesse instante exato (ela já está saindo).
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       navigation.goBack();
     } catch (erroAoSalvar) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setErro(mensagemDeErro(erroAoSalvar, 'salvar'));
     } finally {
       setSalvando(false);
@@ -143,7 +170,16 @@ export default function NovaTransacaoScreen() {
   function confirmarExclusao() {
     Alert.alert('Excluir transação', 'Essa ação não pode ser desfeita.', [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Excluir', style: 'destructive', onPress: excluir },
+      {
+        text: 'Excluir',
+        style: 'destructive',
+        // Toque de "atenção" no exato instante que confirma a ação
+        // irreversível — mesmo padrão nas outras telas com exclusão.
+        onPress: () => {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          excluir();
+        },
+      },
     ]);
   }
 
@@ -158,97 +194,93 @@ export default function NovaTransacaoScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.conteudo}>
-      <Text style={styles.rotulo}>Descrição</Text>
-      <TextInput
-        style={styles.input}
-        value={descricao}
-        onChangeText={setDescricao}
-        placeholder="Ex: Salário de agosto"
-      />
+    <View style={styles.wrapper}>
+      <BrilhoCeu />
+      <ScrollView style={styles.container} contentContainerStyle={styles.conteudo}>
+        <Text style={styles.rotulo}>Descrição</Text>
+        <CampoTexto value={descricao} onChangeText={setDescricao} placeholder="Ex: Salário de agosto" />
 
-      <Text style={styles.rotulo}>Valor (R$)</Text>
-      <TextInput
-        style={styles.input}
-        value={valorTexto}
-        onChangeText={setValorTexto}
-        placeholder="Ex: 3000"
-        keyboardType="decimal-pad"
-      />
+        <Text style={styles.rotulo}>Valor (R$)</Text>
+        <CampoMoeda valor={valor} onChangeValor={setValor} />
 
-      <Text style={styles.rotulo}>Data</Text>
-      <TextInput
-        style={styles.input}
-        value={data}
-        onChangeText={setData}
-        placeholder="AAAA-MM-DD"
-      />
+        <Text style={styles.rotulo}>Data</Text>
+        <CampoData valor={data} onChangeValor={setData} atalhosRapidos />
 
-      <Text style={styles.rotulo}>Tipo</Text>
-      <View style={styles.opcoes}>
-        <OpcaoBotao label="Receita" selecionado={tipo === 'receita'} onPress={() => setTipo('receita')} />
-        <OpcaoBotao label="Despesa" selecionado={tipo === 'despesa'} onPress={() => setTipo('despesa')} />
-      </View>
-
-      <Text style={styles.rotulo}>Frequência</Text>
-      <View style={styles.opcoes}>
-        <OpcaoBotao
-          label="Avulsa (única vez)"
-          selecionado={frequencia === 'unica'}
-          onPress={() => setFrequencia('unica')}
-        />
-        <OpcaoBotao
-          label="Mensal (repete)"
-          selecionado={frequencia === 'mensal'}
-          onPress={() => setFrequencia('mensal')}
-        />
-      </View>
-
-      {frequencia === 'mensal' && (
-        <>
-          <Text style={styles.rotulo}>Repete até quando? (opcional)</Text>
-          <TextInput
-            style={styles.input}
-            value={dataFimTexto}
-            onChangeText={setDataFimTexto}
-            placeholder="Deixe em branco pra repetir sempre"
+        <Text style={styles.rotulo}>Tipo</Text>
+        <View style={styles.opcoes}>
+          <OpcaoBotao
+            label="Receita"
+            selecionado={tipo === 'receita'}
+            onPress={() => setTipo('receita')}
           />
-        </>
-      )}
+          <OpcaoBotao
+            label="Despesa"
+            selecionado={tipo === 'despesa'}
+            onPress={() => setTipo('despesa')}
+          />
+        </View>
 
-      <Text style={styles.rotulo}>Categoria</Text>
-      <CampoCategoria
-        tipo={tipo}
-        categorias={categorias}
-        valor={categoriaTexto}
-        onChangeValor={setCategoriaTexto}
-      />
+        <Text style={styles.rotulo}>Frequência</Text>
+        <View style={styles.opcoes}>
+          <OpcaoBotao
+            label="Avulsa (única vez)"
+            selecionado={frequencia === 'unica'}
+            onPress={() => setFrequencia('unica')}
+          />
+          <OpcaoBotao
+            label="Mensal (repete)"
+            selecionado={frequencia === 'mensal'}
+            onPress={() => setFrequencia('mensal')}
+          />
+        </View>
 
-      {erro && <Text style={styles.erro}>{erro}</Text>}
+        {frequencia === 'mensal' && (
+          <>
+            <Text style={styles.rotulo}>Repete por quantos meses? (opcional)</Text>
+            <CampoTexto
+              value={quantidadeMesesTexto}
+              onChangeText={setQuantidadeMesesTexto}
+              placeholder="Ex: 12 — deixe em branco pra repetir sempre"
+              keyboardType="number-pad"
+            />
+          </>
+        )}
 
-      <Pressable
-        style={[styles.botaoSalvar, salvando && styles.botaoDesabilitado]}
-        onPress={salvar}
-        disabled={salvando}
-      >
-        <Text style={styles.botaoSalvarTexto}>
-          {salvando ? 'Salvando...' : idEditando ? 'Salvar alterações' : 'Salvar'}
-        </Text>
-      </Pressable>
+        <Text style={styles.rotulo}>Categoria</Text>
+        <CampoCategoria
+          tipo={tipo}
+          categorias={categorias}
+          valor={categoriaTexto}
+          onChangeValor={setCategoriaTexto}
+        />
 
-      {idEditando && (
-        <Pressable style={styles.botaoExcluir} onPress={confirmarExclusao}>
-          <Text style={styles.botaoExcluirTexto}>Excluir transação</Text>
-        </Pressable>
-      )}
-    </ScrollView>
+        {erro && <Text style={styles.erro}>{erro}</Text>}
+
+        <View style={styles.botaoSalvar}>
+          <BotaoPrimario
+            label={salvando ? 'Salvando...' : idEditando ? 'Salvar alterações' : 'Salvar'}
+            onPress={salvar}
+            desabilitado={salvando}
+          />
+        </View>
+
+        {idEditando && (
+          <Pressable style={styles.botaoExcluir} onPress={confirmarExclusao}>
+            <Text style={styles.botaoExcluirTexto}>Excluir transação</Text>
+          </Pressable>
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  wrapper: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  container: {
+    flex: 1,
   },
   conteudo: {
     padding: 24,
@@ -259,14 +291,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: 16,
     marginBottom: 6,
-  },
-  input: {
-    backgroundColor: colors.surface,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    color: colors.text,
   },
   opcoes: {
     flexDirection: 'row',
@@ -279,26 +303,13 @@ const styles = StyleSheet.create({
   },
   botaoSalvar: {
     marginTop: 24,
-    backgroundColor: colors.primary,
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: 'center',
   },
-  botaoSalvarTexto: {
-    color: colors.surface,
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  botaoDesabilitado: {
-    opacity: 0.6,
-  },
+  // Sem borda: ação destrutiva no iOS é texto colorido (aqui, vermelho), não
+  // uma caixa contornada — mesma lógica do botão secundário sem caixa.
   botaoExcluir: {
     marginTop: 12,
     paddingVertical: 14,
-    borderRadius: 8,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.danger,
   },
   botaoExcluirTexto: {
     color: colors.danger,

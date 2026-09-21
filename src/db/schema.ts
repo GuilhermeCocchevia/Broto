@@ -42,6 +42,16 @@ export const transacoes = sqliteTable('transacoes', {
 export const simulacoes = sqliteTable('simulacoes', {
   id: text('id').primaryKey(),
   descricao: text('descricao').notNull(),
+  // `.default('compra')` preserva o comportamento de toda simulação
+  // cadastrada antes desse campo existir (só existia "compra" na época).
+  // 'rendimento' e 'aposentadoria' foram adicionados depois de 'economia'
+  // sem precisar de migration nenhuma: essa coluna já era TEXT puro
+  // (SQLite não tem constraint de enum de verdade, ver comentário em
+  // `categorias` acima) — ampliar esse array só afeta o TypeScript, não o
+  // banco.
+  tipo: text('tipo', { enum: ['compra', 'economia', 'rendimento', 'aposentadoria'] })
+    .notNull()
+    .default('compra'),
   valorTotal: real('valor_total').notNull(),
   // `integer` mesmo — número de parcelas é sempre inteiro (não existe 3,5 parcelas).
   parcelas: integer('parcelas').notNull(),
@@ -54,6 +64,14 @@ export const simulacoes = sqliteTable('simulacoes', {
   // tabela que já existe, toda simulação antiga também vira 0 (sem juros) —
   // preserva o comportamento de antes desse campo existir.
   taxaJurosMensal: real('taxa_juros_mensal').notNull().default(0),
+  // Só usado por 'rendimento'/'aposentadoria': um valor guardado à parte
+  // (ex: dinheiro que a pessoa já tem aplicado em outro lugar), que entra
+  // na conta de juros compostos junto dos aportes mensais, mas não é um
+  // aporte recorrente — mesmo `.default(0)` de sempre, preserva o
+  // comportamento de antes desse campo existir (nenhum investimento
+  // inicial) tanto pra simulações antigas quanto pra 'compra'/'economia'
+  // (que nunca usam esse campo).
+  aporteInicial: real('aporte_inicial').notNull().default(0),
   criadoEm: text('criado_em').notNull(),
 });
 
@@ -74,4 +92,49 @@ export const metasReserva = sqliteTable('metas_reserva', {
   ativa: integer('ativa', { mode: 'boolean' }).notNull(),
   valorAlvo: real('valor_alvo'),
   criadoEm: text('criado_em').notNull(),
+});
+
+// Diferente de tudo acima: é o ÚNICO lugar do banco que NÃO é insert-only —
+// preferência de app (não dado financeiro) não precisa de histórico, é só
+// "o estado atual". Sempre uma linha só, com `id` fixo (ver
+// `ID_CONFIGURACOES` em useConfiguracoesStore.ts) — a store faz upsert
+// (insere na primeira vez, atualiza depois) em vez de inserir de novo a
+// cada mudança.
+export const configuracoes = sqliteTable('configuracoes', {
+  id: text('id').primaryKey(),
+  // Liga/desliga as animações contínuas (nuvens, Brotinho andando) —
+  // complementa (não substitui) o "Reduzir Movimento" do sistema
+  // operacional: o app respeita os dois, ver useReduzirMovimento.ts.
+  reduzirAnimacoes: integer('reduzir_animacoes', { mode: 'boolean' }).notNull().default(false),
+  // "Não mostrar esta janela novamente" no modal de avisos da Aposentadoria
+  // (ver AvisoAposentadoriaModal.tsx) — precisa persistir de verdade entre
+  // sessões (não é um estado só da tela), por isso mora aqui junto das
+  // outras preferências, não num useState solto.
+  naoMostrarAvisoAposentadoria: integer('nao_mostrar_aviso_aposentadoria', { mode: 'boolean' })
+    .notNull()
+    .default(false),
+  // Índice (dentro de curiosidadesInvestimento.ts) da última curiosidade
+  // mostrada no Dashboard — guardado só pra não repetir a mesma na próxima
+  // abertura do app (ver escolherProximaCuriosidade em logic/curiosidades.ts).
+  // `null` (nunca definido) é o estado de quem abre o app pela primeira vez
+  // depois dessa coluna existir.
+  curiosidadeIndice: integer('curiosidade_indice'),
+});
+
+// Mesmo padrão singleton-upsert de `configuracoes` (uma linha só, id fixo)
+// — é o cache das taxas públicas de referência (Selic, CDI, Tesouro
+// RendA+) usadas nas simulações de Rendimento/Aposentadoria. Não é dado
+// financeiro do usuário (não segue o padrão insert-only de
+// `saldosIniciais`/`simulacoes`): é só "a última vez que o app buscou essas
+// taxas públicas", atualizado só quando o usuário toca em "Atualizar
+// taxas" (ver useTaxasReferenciaStore.ts) — nunca em segundo plano.
+export const taxasReferencia = sqliteTable('taxas_referencia', {
+  id: text('id').primaryKey(),
+  selicMetaAnual: real('selic_meta_anual'),
+  cdiAnualizadoAnual: real('cdi_anualizado_anual'),
+  // JSON serializado: [{ vencimento: 'AAAA-MM-DD', taxaAnual: number }] —
+  // lista variável de vencimentos do Tesouro RendA+, não vale a pena virar
+  // tabela própria só pra isso.
+  tesouroRendaMaisJson: text('tesouro_renda_mais_json'),
+  atualizadoEm: text('atualizado_em'),
 });

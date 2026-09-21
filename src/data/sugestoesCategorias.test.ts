@@ -79,3 +79,50 @@ test('buscar "ingles" encontra aula de idiomas', () => {
 
   expect(resultado).toContain('Aula de idiomas');
 });
+
+test('buscar "higiene" encontra produtos de higiene pessoal', () => {
+  const resultado = buscar(SUGESTOES_DESPESA, 'higiene');
+
+  expect(resultado).toContain('Higiene pessoal');
+});
+
+test('buscar "maquiagem" encontra produtos estéticos', () => {
+  const resultado = buscar(SUGESTOES_DESPESA, 'maquiagem');
+
+  expect(resultado).toContain('Maquiagem e produtos estéticos');
+});
+
+test('buscar "limpeza" encontra produtos de limpeza da casa', () => {
+  const resultado = buscar(SUGESTOES_DESPESA, 'limpeza');
+
+  expect(resultado).toContain('Produtos de limpeza');
+});
+
+test('buscar "bolsa" encontra bolsas e acessórios', () => {
+  const resultado = buscar(SUGESTOES_DESPESA, 'bolsa');
+
+  expect(resultado).toContain('Bolsas e acessórios');
+});
+
+test('categoria "Lazer" genérica existe além das específicas (cinema, viagem...)', () => {
+  const resultado = buscar(SUGESTOES_DESPESA, 'lazer');
+
+  expect(resultado).toContain('Lazer');
+  expect(resultado).toContain('Cinema');
+});
+
+test('buscar "veiculo" encontra compra de carro e moto, não só manutenção', () => {
+  const resultado = buscar(SUGESTOES_DESPESA, 'veiculo');
+
+  expect(resultado).toContain('Compra de carro');
+  expect(resultado).toContain('Compra de moto');
+  expect(resultado).toContain('Manutenção do carro');
+});
+
+test('buscar "financiamento" encontra financiamento de veículo, imóvel e o genérico', () => {
+  const resultado = buscar(SUGESTOES_DESPESA, 'financiamento');
+
+  expect(resultado).toContain('Compra de carro');
+  expect(resultado).toContain('Financiamento imobiliário');
+  expect(resultado).toContain('Financiamento');
+});

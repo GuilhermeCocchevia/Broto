@@ -1,0 +1,1 @@
+ALTER TABLE `configuracoes` ADD `nao_mostrar_aviso_aposentadoria` integer DEFAULT false NOT NULL;

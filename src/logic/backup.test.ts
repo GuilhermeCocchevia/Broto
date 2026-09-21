@@ -12,7 +12,6 @@ test('montarBackup inclui a versão atual e todas as tabelas passadas', () => {
     transacoes: [],
     simulacoes: [],
     saldosIniciais: [],
-    metasReserva: [],
   });
 
   expect(backup.versao).toBe(VERSAO_BACKUP_ATUAL);
@@ -27,7 +26,6 @@ test('lerBackup faz o caminho de ida e volta: monta, serializa, lê de novo, dad
     transacoes: [],
     simulacoes: [],
     saldosIniciais: [],
-    metasReserva: [],
   });
 
   const resultado = lerBackup(JSON.stringify(backup));
@@ -60,7 +58,6 @@ test('lerBackup rejeita uma versão de backup diferente da atual', () => {
     transacoes: [],
     simulacoes: [],
     saldosIniciais: [],
-    metasReserva: [],
   });
   const backupComVersaoErrada = { ...backup, versao: 999 };
 
@@ -78,7 +75,6 @@ test('lerBackup rejeita um backup com uma tabela faltando', () => {
     transacoes: [],
     simulacoes: [],
     saldosIniciais: [],
-    metasReserva: [],
   });
   const { categorias, ...backupIncompleto } = backup;
 

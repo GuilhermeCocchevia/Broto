@@ -1,13 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
+import * as Haptics from 'expo-haptics';
 import { colors } from '../theme/colors';
 import { useCategoriasStore } from '../store/useCategoriasStore';
 import { OpcaoBotao } from '../components/OpcaoBotao';
+import { CampoTexto } from '../components/CampoTexto';
+import { BotaoPrimario } from '../components/BotaoPrimario';
+import { BrilhoCeu } from '../components/CenaGameficada';
 import { mensagemDeErro } from '../utils/mensagemDeErro';
 import { normalizarTexto } from '../utils/normalizarTexto';
+import { interpolarCor } from '../utils/corPorValor';
 import {
   SUGESTOES_RECEITA,
   SUGESTOES_DESPESA,
@@ -34,6 +39,11 @@ const CORES_DISPONIVEIS = [
   colors.danger,
   colors.warning,
 ];
+
+// Altura (em px) da faixa mais escura que sobra embaixo da bolinha "de pé"
+// — mesma técnica 3D do resto dos botões do app (ver BotaoPrimario). Some
+// quando a cor está selecionada, ver JSX.
+const ALTURA_BASE_BOLINHA = 3;
 
 export default function NovaCategoriaScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -117,8 +127,10 @@ export default function NovaCategoriaScreen() {
       } else {
         await adicionar({ nome: nome.trim(), tipo, cor });
       }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       navigation.goBack();
     } catch (erroAoSalvar) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setErro(mensagemDeErro(erroAoSalvar, 'salvar'));
     } finally {
       setSalvando(false);
@@ -128,7 +140,14 @@ export default function NovaCategoriaScreen() {
   function confirmarExclusao() {
     Alert.alert('Excluir categoria', 'Essa ação não pode ser desfeita.', [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Excluir', style: 'destructive', onPress: excluir },
+      {
+        text: 'Excluir',
+        style: 'destructive',
+        onPress: () => {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          excluir();
+        },
+      },
     ]);
   }
 
@@ -143,80 +162,112 @@ export default function NovaCategoriaScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.conteudo}>
-      <Text style={styles.rotulo}>Nome</Text>
-      <TextInput
-        style={styles.input}
-        value={nome}
-        onChangeText={(texto) => {
-          setNome(texto);
-          setEstadoCampoNome('digitando');
-        }}
-        placeholder="Ex: Alimentação"
-      />
+    <View style={styles.wrapper}>
+      <BrilhoCeu />
+      <ScrollView style={styles.container} contentContainerStyle={styles.conteudo}>
+        <Text style={styles.rotulo}>Nome</Text>
+        <CampoTexto
+          value={nome}
+          onChangeText={(texto) => {
+            setNome(texto);
+            setEstadoCampoNome('digitando');
+          }}
+          placeholder="Ex: Alimentação"
+        />
 
-      {mostrarSugestoesNome && (
+        {mostrarSugestoesNome && (
+          <View style={styles.opcoes}>
+            {sugestoes.map((sugestao) => (
+              <OpcaoBotao
+                key={sugestao.nome}
+                label={sugestao.nome}
+                selecionado={false}
+                onPress={() => {
+                  setNome(sugestao.nome);
+                  setEstadoCampoNome('confirmado');
+                }}
+              />
+            ))}
+          </View>
+        )}
+
+        <Text style={styles.rotulo}>Tipo</Text>
         <View style={styles.opcoes}>
-          {sugestoes.map((sugestao) => (
-            <OpcaoBotao
-              key={sugestao.nome}
-              label={sugestao.nome}
-              selecionado={false}
-              onPress={() => {
-                setNome(sugestao.nome);
-                setEstadoCampoNome('confirmado');
-              }}
-            />
-          ))}
-        </View>
-      )}
-
-      <Text style={styles.rotulo}>Tipo</Text>
-      <View style={styles.opcoes}>
-        <OpcaoBotao label="Receita" selecionado={tipo === 'receita'} onPress={() => setTipo('receita')} />
-        <OpcaoBotao label="Despesa" selecionado={tipo === 'despesa'} onPress={() => setTipo('despesa')} />
-      </View>
-
-      <Text style={styles.rotulo}>Cor</Text>
-      <View style={styles.opcoes}>
-        {CORES_DISPONIVEIS.map((corDisponivel) => (
-          <Pressable
-            key={corDisponivel}
-            style={[
-              styles.bolinhaCor,
-              { backgroundColor: corDisponivel },
-              cor === corDisponivel && styles.bolinhaCorSelecionada,
-            ]}
-            onPress={() => setCor(corDisponivel)}
+          <OpcaoBotao
+            label="Receita"
+            selecionado={tipo === 'receita'}
+            onPress={() => setTipo('receita')}
           />
-        ))}
-      </View>
+          <OpcaoBotao
+            label="Despesa"
+            selecionado={tipo === 'despesa'}
+            onPress={() => setTipo('despesa')}
+          />
+        </View>
 
-      {erro && <Text style={styles.erro}>{erro}</Text>}
+        <Text style={styles.rotulo}>Cor</Text>
+        <View style={styles.opcoes}>
+          {CORES_DISPONIVEIS.map((corDisponivel) => {
+            const selecionada = cor === corDisponivel;
+            // Mesmo visual "de botão de jogo pixel" do resto do app (base
+            // mais escura embaixo + brilho no topo) — a bolinha escolhida
+            // fica com esse "afundado" permanente (a base some) + um
+            // contorno mais grosso, pra ficar óbvia qual está selecionada
+            // sem depender só do olho pra cor.
+            const corBase = interpolarCor(corDisponivel, '#000000', 0.3);
+            return (
+              <Pressable
+                key={corDisponivel}
+                style={[
+                  styles.bolinhaMoldura,
+                  { backgroundColor: corBase },
+                  selecionada && styles.bolinhaMolduraSelecionada,
+                ]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setCor(corDisponivel);
+                }}
+              >
+                <View
+                  style={[
+                    styles.bolinhaFace,
+                    { backgroundColor: corDisponivel, bottom: selecionada ? 0 : ALTURA_BASE_BOLINHA },
+                  ]}
+                >
+                  <View style={styles.bolinhaBrilho} pointerEvents="none" />
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
 
-      <Pressable
-        style={[styles.botaoSalvar, salvando && styles.botaoDesabilitado]}
-        onPress={salvar}
-        disabled={salvando}
-      >
-        <Text style={styles.botaoSalvarTexto}>
-          {salvando ? 'Salvando...' : idEditando ? 'Salvar alterações' : 'Salvar'}
-        </Text>
-      </Pressable>
+        {erro && <Text style={styles.erro}>{erro}</Text>}
 
-      {idEditando && (
-        <Pressable style={styles.botaoExcluir} onPress={confirmarExclusao}>
-          <Text style={styles.botaoExcluirTexto}>Excluir categoria</Text>
-        </Pressable>
-      )}
-    </ScrollView>
+        <View style={styles.botaoSalvar}>
+          <BotaoPrimario
+            label={salvando ? 'Salvando...' : idEditando ? 'Salvar alterações' : 'Salvar'}
+            onPress={salvar}
+            desabilitado={salvando}
+          />
+        </View>
+
+        {idEditando && (
+          <Pressable style={styles.botaoExcluir} onPress={confirmarExclusao}>
+            <Text style={styles.botaoExcluirTexto}>Excluir categoria</Text>
+          </Pressable>
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  wrapper: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  container: {
+    flex: 1,
   },
   conteudo: {
     padding: 24,
@@ -228,28 +279,41 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 6,
   },
-  input: {
-    backgroundColor: colors.surface,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    color: colors.text,
-  },
   opcoes: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
-  bolinhaCor: {
+  bolinhaMoldura: {
     width: 36,
     height: 36,
     borderRadius: 18,
     borderWidth: 2,
-    borderColor: 'transparent',
+    borderColor: 'rgba(0, 0, 0, 0.4)',
+    overflow: 'hidden',
   },
-  bolinhaCorSelecionada: {
+  // Contorno mais grosso e escuro (não uma cor nova) — junto com a base
+  // "afundada" (ver `bottom` no JSX), deixa claro qual bolinha é a
+  // escolhida sem precisar de um ícone de check separado.
+  bolinhaMolduraSelecionada: {
+    borderWidth: 3,
     borderColor: colors.text,
+  },
+  bolinhaFace: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    borderRadius: 18,
+    overflow: 'hidden',
+  },
+  bolinhaBrilho: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
   },
   erro: {
     color: colors.danger,
@@ -257,26 +321,13 @@ const styles = StyleSheet.create({
   },
   botaoSalvar: {
     marginTop: 24,
-    backgroundColor: colors.primary,
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: 'center',
   },
-  botaoSalvarTexto: {
-    color: colors.surface,
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  botaoDesabilitado: {
-    opacity: 0.6,
-  },
+  // Sem borda: ação destrutiva no iOS é texto colorido, não uma caixa
+  // contornada — mesma lógica do botão secundário sem caixa.
   botaoExcluir: {
     marginTop: 12,
     paddingVertical: 14,
-    borderRadius: 8,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.danger,
   },
   botaoExcluirTexto: {
     color: colors.danger,

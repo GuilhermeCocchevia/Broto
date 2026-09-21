@@ -3,7 +3,7 @@
 // resto da lógica de backup, isso TOCA no banco de verdade — não dá pra
 // testar com Jest puro, só ao vivo no simulador/aparelho.
 import { db } from './client';
-import { categorias, transacoes, simulacoes, saldosIniciais, metasReserva } from './schema';
+import { categorias, transacoes, simulacoes, saldosIniciais } from './schema';
 import type { Backup } from '../logic/backup';
 
 // Restaurar SUBSTITUI tudo que existe hoje pelo conteúdo do backup — não
@@ -26,7 +26,6 @@ export async function restaurarBackup(backup: Backup): Promise<void> {
   await db.delete(simulacoes);
   await db.delete(categorias);
   await db.delete(saldosIniciais);
-  await db.delete(metasReserva);
 
   // E insere na ordem inversa: categoria (e saldo, que não depende de nada)
   // primeiro, quem referencia categoria depois — senão o PRAGMA foreign_keys
@@ -43,8 +42,5 @@ export async function restaurarBackup(backup: Backup): Promise<void> {
   }
   if (backup.simulacoes.length > 0) {
     await db.insert(simulacoes).values(backup.simulacoes);
-  }
-  if (backup.metasReserva.length > 0) {
-    await db.insert(metasReserva).values(backup.metasReserva);
   }
 }

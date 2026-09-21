@@ -112,6 +112,10 @@ export const SUGESTOES_DESPESA: SugestaoCategoria[] = [
   { nome: 'Financiamento imobiliário', apelidos: ['casa propria', 'moradia'] },
   { nome: 'IPTU', apelidos: ['imposto', 'moradia'] },
   { nome: 'Manutenção da casa', apelidos: ['moradia', 'reforma', 'reparo', 'conserto'] },
+  {
+    nome: 'Produtos de limpeza',
+    apelidos: ['limpeza', 'limpeza domestica', 'detergente', 'desinfetante', 'material de limpeza'],
+  },
   { nome: 'Móveis e decoração', apelidos: ['casa', 'mobilia', 'moradia'] },
   { nome: 'Eletrodomésticos', apelidos: ['casa', 'moradia'] },
   { nome: 'Seguro residencial', apelidos: ['casa', 'moradia', 'seguro'] },
@@ -172,6 +176,21 @@ export const SUGESTOES_DESPESA: SugestaoCategoria[] = [
   { nome: 'Lanche', apelidos: ['alimentacao', 'cafe'] },
 
   // Transporte
+  {
+    nome: 'Compra de carro',
+    apelidos: ['veiculo', 'carro novo', 'carro usado', 'financiamento', 'financiamento de veiculo'],
+  },
+  {
+    nome: 'Compra de moto',
+    apelidos: [
+      'veiculo',
+      'motocicleta',
+      'moto nova',
+      'moto usada',
+      'financiamento',
+      'financiamento de veiculo',
+    ],
+  },
   { nome: 'Combustível', apelidos: ['gasolina', 'alcool', 'diesel', 'transporte', 'abastecimento'] },
   { nome: 'Transporte público', apelidos: ['onibus', 'metro', 'trem', 'transporte'] },
   { nome: 'Aplicativo de transporte', apelidos: ['uber', '99', 'transporte'] },
@@ -207,6 +226,28 @@ export const SUGESTOES_DESPESA: SugestaoCategoria[] = [
   { nome: 'Óculos e lentes', apelidos: ['otica', 'saude'] },
   { nome: 'Suplementos e vitaminas', apelidos: ['saude'] },
 
+  // Higiene e beleza
+  {
+    nome: 'Higiene pessoal',
+    apelidos: [
+      'higiene',
+      'produtos de higiene',
+      'sabonete',
+      'shampoo',
+      'pasta de dente',
+      'desodorante',
+      'papel higienico',
+    ],
+  },
+  {
+    nome: 'Maquiagem e produtos estéticos',
+    apelidos: ['beleza', 'maquiagem', 'cosmeticos', 'skincare', 'perfumaria'],
+  },
+  {
+    nome: 'Cabeleireiro e salão de beleza',
+    apelidos: ['beleza', 'cabelo', 'salao', 'manicure', 'pedicure', 'barbearia'],
+  },
+
   // Educação
   { nome: 'Mensalidade escolar', apelidos: ['escola', 'educacao'] },
   { nome: 'Faculdade', apelidos: ['universidade', 'educacao'] },
@@ -222,6 +263,10 @@ export const SUGESTOES_DESPESA: SugestaoCategoria[] = [
   { nome: 'Livros', apelidos: ['educacao', 'leitura'] },
 
   // Lazer
+  // "Lazer" genérico primeiro — pra quando nenhuma das opções mais
+  // específicas abaixo encaixa direito, sem forçar o usuário a escolher
+  // uma categoria errada só pra ter alguma.
+  { nome: 'Lazer', apelidos: ['entretenimento', 'diversao', 'programa'] },
   { nome: 'Cinema', apelidos: ['lazer'] },
   { nome: 'Viagem', apelidos: ['lazer', 'ferias', 'turismo'] },
   { nome: 'Assinaturas', apelidos: ['lazer'] },
@@ -232,6 +277,7 @@ export const SUGESTOES_DESPESA: SugestaoCategoria[] = [
   // Compras
   { nome: 'Roupas', apelidos: ['vestuario', 'compras'] },
   { nome: 'Calçados', apelidos: ['vestuario', 'compras', 'sapato', 'tenis'] },
+  { nome: 'Bolsas e acessórios', apelidos: ['bolsa', 'mochila', 'carteira', 'acessorios', 'compras'] },
   { nome: 'Eletrônicos', apelidos: ['compras', 'tecnologia'] },
   { nome: 'Presentes', apelidos: ['compras'] },
   { nome: 'Papelaria', apelidos: ['compras'] },

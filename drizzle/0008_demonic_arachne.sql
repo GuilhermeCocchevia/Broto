@@ -1,0 +1,1 @@
+ALTER TABLE `simulacoes` ADD `aporte_inicial` real DEFAULT 0 NOT NULL;

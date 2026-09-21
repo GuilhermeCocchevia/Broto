@@ -38,23 +38,71 @@ export type Transacao = {
   dataFim: string | null;
 };
 
+// 'compra' = parcelamento de uma compra hipotética (comportamento original).
+// 'economia' = meta de guardar dinheiro (ex: "juntar pra uma viagem").
+// 'rendimento' = a mesma ideia de 'economia' (guardar um valor por mês),
+// mas também simula esse valor RENDENDO a uma taxa — o usuário pode digitar
+// livremente, ou usar uma taxa pública de referência (Selic/CDI, buscada
+// sob demanda — ver taxasReferencia.ts) só como ponto de partida.
+// 'aposentadoria' = mesma mecânica de 'rendimento', mas focada em
+// longuíssimo prazo, com referência ao Tesouro RendA+ Aposentadoria Extra
+// (o título que o próprio Tesouro Nacional desenhou pra isso) e avisos de
+// risco obrigatórios na tela (iliquidez, vencimento real, IR). Em nenhum
+// dos dois casos o app recomenda uma taxa nem um investimento específico,
+// só faz a conta com o número escolhido.
+// As quatro usam EXATAMENTE os mesmos campos por baixo
+// (valorTotal/parcelas/taxaJurosMensal), só muda como a tela pergunta/mostra
+// pra pessoa (ver NovaSimulacaoScreen.tsx) e a cor/marcador na lista (ver
+// SimuladorScreen.tsx). Pra projeção de saldo (calcularSaldoProjetado), as
+// quatro são idênticas: dinheiro compromissado some do disponível todo mês,
+// não importa se é parcela de dívida, contribuição pra uma meta ou aporte
+// de investimento — o efeito no "quanto sobra" é o mesmo; só o painel de
+// rendimento projetado (exclusivo de 'rendimento'/'aposentadoria') usa
+// `taxaJurosMensal` pra algo além dessa conta.
+export type TipoSimulacao = 'compra' | 'economia' | 'rendimento' | 'aposentadoria';
+
 export type Simulacao = {
   id: string;
   descricao: string;
-  // Valor total da compra simulada, ex: uma TV de R$1000.
+  tipo: TipoSimulacao;
+  // Pra 'compra': valor total da compra (ex: uma TV de R$1000).
+  // Pra 'economia'/'rendimento'/'aposentadoria': valor total da meta (ex:
+  // R$3000 pra uma viagem, ou R$3600 se a pessoa pretende guardar
+  // R$300/mês por 12 meses).
   valorTotal: number;
-  // Número de parcelas. 1 = à vista, pagou tudo de uma vez.
+  // Pra 'compra': número de parcelas (1 = à vista).
+  // Pra 'economia'/'rendimento'/'aposentadoria': em quantos meses a pessoa
+  // quer atingir a meta/fazer os aportes (pra 'aposentadoria', isso é
+  // calculado a partir do vencimento real escolhido, ver
+  // NovaSimulacaoScreen.tsx — não é um campo novo, é só a forma de
+  // PREENCHER este mesmo campo).
   parcelas: number;
-  // Data da primeira parcela — a partir dela é que o dashboard projeta o impacto
-  // nos meses seguintes.
+  // Data da primeira parcela (compra) ou do início da contribuição
+  // (economia/rendimento/aposentadoria) — a partir dela é que o dashboard
+  // projeta o impacto nos meses seguintes.
   dataInicio: string;
   categoriaId: string;
   // Taxa de juros AO MÊS, como fração (0.02 = 2% ao mês) — não em porcentagem
   // inteira, pra usar direto na fórmula de juros compostos sem converter toda
   // vez. 0 = sem juros (parcelamento "normal", divide igual — era o único
   // comportamento que existia antes desse campo existir; qualquer simulação
-  // antiga no banco recebe 0 automaticamente, ver migration).
+  // antiga no banco recebe 0 automaticamente, ver migration). Sempre 0 pra
+  // 'economia' (meta de guardar dinheiro não tem juros). Pra
+  // 'rendimento'/'aposentadoria', esse MESMO campo muda de sentido: não é
+  // custo de parcelamento, é a taxa de rendimento esperada do valor
+  // guardado (ver calcularValorFuturoComAportes/calcularValorFuturoLiquido
+  // em projecao.ts/custosRendaFixa.ts) — o usuário quem informa (ou escolhe
+  // de uma taxa pública de referência), o app nunca sugere um número.
   taxaJurosMensal: number;
+  // Só usado por 'rendimento'/'aposentadoria' — sempre 0 pra 'compra'/
+  // 'economia'. Um valor que a pessoa já tem guardado (fora do fluxo mensal
+  // de aportes) e quer incluir na simulação: entra na conta de juros
+  // compostos igual aos aportes mensais (ver
+  // calcularValorFuturoComAportes/calcularValorFuturoLiquido), mas sai do
+  // saldo projetado só UMA vez, no primeiro mês da simulação — não é
+  // dividido entre os meses como o aporte recorrente (ver
+  // calcularSaidaEfetivaNoMes em projecao.ts).
+  aporteInicial: number;
   // Quando a simulação foi criada (não confundir com dataInicio da compra em si).
   // Serve pra ordenar "simulações recentes" numa lista, por exemplo.
   criadoEm: string;

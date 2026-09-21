@@ -2,13 +2,15 @@ import { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
+import * as Haptics from 'expo-haptics';
 import { File, Paths } from 'expo-file-system';
+import { BrilhoCeu } from '../components/CenaGameficada';
+import { BotaoPrimario } from '../components/BotaoPrimario';
 import { colors } from '../theme/colors';
 import { useCategoriasStore } from '../store/useCategoriasStore';
 import { useTransacoesStore } from '../store/useTransacoesStore';
 import { useSimulacoesStore } from '../store/useSimulacoesStore';
 import { useSaldoInicialStore } from '../store/useSaldoInicialStore';
-import { useMetaReservaStore } from '../store/useMetaReservaStore';
 import { montarBackup, lerBackup } from '../logic/backup';
 import { restaurarBackup } from '../db/restaurarBackup';
 import { mensagemDeErro } from '../utils/mensagemDeErro';
@@ -29,8 +31,6 @@ export default function BackupScreen() {
   const carregarSimulacoes = useSimulacoesStore((state) => state.carregar);
   const saldosIniciais = useSaldoInicialStore((state) => state.saldosIniciais);
   const carregarSaldoInicial = useSaldoInicialStore((state) => state.carregar);
-  const metasReserva = useMetaReservaStore((state) => state.metas);
-  const carregarMetasReserva = useMetaReservaStore((state) => state.carregar);
 
   const [mensagem, setMensagem] = useState<string | null>(null);
   const [exportando, setExportando] = useState(false);
@@ -48,16 +48,12 @@ export default function BackupScreen() {
     carregarTransacoes();
     carregarSimulacoes();
     carregarSaldoInicial();
-    carregarMetasReserva();
-  }, [
-    carregarCategorias,
-    carregarTransacoes,
-    carregarSimulacoes,
-    carregarSaldoInicial,
-    carregarMetasReserva,
-  ]);
+  }, [carregarCategorias, carregarTransacoes, carregarSimulacoes, carregarSaldoInicial]);
 
   async function exportar() {
+    // Toque no instante do toque em si (não espera o resultado) — mesmo
+    // padrão de "confirmar que o botão reagiu" usado no resto do app.
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setMensagem(null);
     setExportando(true);
     try {
@@ -70,7 +66,6 @@ export default function BackupScreen() {
         carregarTransacoes(),
         carregarSimulacoes(),
         carregarSaldoInicial(),
-        carregarMetasReserva(),
       ]);
 
       const backup = montarBackup({
@@ -78,7 +73,6 @@ export default function BackupScreen() {
         transacoes: useTransacoesStore.getState().transacoes,
         simulacoes: useSimulacoesStore.getState().simulacoes,
         saldosIniciais: useSaldoInicialStore.getState().saldosIniciais,
-        metasReserva: useMetaReservaStore.getState().metas,
       });
 
       // Paths.cache (não Paths.document): esse arquivo só existe pra ser
@@ -109,6 +103,7 @@ export default function BackupScreen() {
   }
 
   async function importar() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setMensagem(null);
     const resultado = await DocumentPicker.getDocumentAsync({ type: 'application/json' });
     if (resultado.canceled) {
@@ -134,7 +129,10 @@ export default function BackupScreen() {
         {
           text: 'Restaurar',
           style: 'destructive',
-          onPress: () => restaurarEDepoisRecarregar(leitura.backup),
+          onPress: () => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            restaurarEDepoisRecarregar(leitura.backup);
+          },
         },
       ],
     );
@@ -149,10 +147,11 @@ export default function BackupScreen() {
         carregarTransacoes(),
         carregarSimulacoes(),
         carregarSaldoInicial(),
-        carregarMetasReserva(),
       ]);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setMensagem('Backup restaurado com sucesso.');
     } catch (erro) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setMensagem(mensagemDeErro(erro, 'salvar'));
     } finally {
       setImportando(false);
@@ -160,42 +159,53 @@ export default function BackupScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.conteudo}>
-      <Text style={styles.titulo}>Backup</Text>
-      <Text style={styles.texto}>
-        Seus dados ficam só neste aparelho. Exporte de vez em quando e guarde o arquivo na nuvem
-        de sua preferência — assim, se trocar de aparelho ou desinstalar o app, dá pra recarregar
-        tudo importando esse mesmo arquivo de volta.
-      </Text>
-
-      <View style={styles.resumo}>
-        <Text style={styles.resumoTexto}>{categorias.length} categorias</Text>
-        <Text style={styles.resumoTexto}>{transacoes.length} transações</Text>
-        <Text style={styles.resumoTexto}>{simulacoes.length} simulações</Text>
-        <Text style={styles.resumoTexto}>{saldosIniciais.length} atualizações de saldo</Text>
-        <Text style={styles.resumoTexto}>{metasReserva.length} decisões sobre reserva de emergência</Text>
-      </View>
-
-      <Pressable
-        style={[styles.botao, exportando && styles.botaoDesabilitado]}
-        onPress={exportar}
-        disabled={exportando || importando}
+    // Sem título próprio aqui: a tela usa "Large Title" nativo (ver
+    // RootNavigator.tsx) — o cabeçalho do sistema já mostra "Backup"
+    // grande, repetir o mesmo texto no corpo da tela era redundante.
+    <View style={styles.wrapper}>
+      <BrilhoCeu />
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.conteudo}
+        // Sem isso, o "Large Title" nativo fica flutuando por CIMA do
+        // conteúdo em vez de empurrá-lo pra baixo — ver o comentário
+        // equivalente em SimuladorScreen.tsx.
+        contentInsetAdjustmentBehavior="automatic"
       >
-        <Text style={styles.botaoTexto}>{exportando ? 'Exportando...' : 'Exportar backup'}</Text>
-      </Pressable>
-
-      <Pressable
-        style={[styles.botaoSecundario, importando && styles.botaoDesabilitado]}
-        onPress={importar}
-        disabled={exportando || importando}
-      >
-        <Text style={styles.botaoSecundarioTexto}>
-          {importando ? 'Restaurando...' : 'Importar backup'}
+        <Text style={styles.texto}>
+          Seus dados ficam só neste aparelho. Exporte de vez em quando e guarde o arquivo na nuvem
+          de sua preferência — assim, se trocar de aparelho ou desinstalar o app, dá pra recarregar
+          tudo importando esse mesmo arquivo de volta.
         </Text>
-      </Pressable>
 
-      {mensagem && <Text style={styles.mensagem}>{mensagem}</Text>}
-    </ScrollView>
+        <View style={styles.resumo}>
+          <Text style={styles.resumoTexto}>{categorias.length} categorias</Text>
+          <Text style={styles.resumoTexto}>{transacoes.length} transações</Text>
+          <Text style={styles.resumoTexto}>{simulacoes.length} simulações</Text>
+          <Text style={styles.resumoTexto}>{saldosIniciais.length} atualizações de saldo</Text>
+        </View>
+
+        <View style={styles.botao}>
+          <BotaoPrimario
+            label={exportando ? 'Exportando...' : 'Exportar backup'}
+            onPress={exportar}
+            desabilitado={exportando || importando}
+          />
+        </View>
+
+        <Pressable
+          style={[styles.botaoSecundario, importando && styles.botaoDesabilitado]}
+          onPress={importar}
+          disabled={exportando || importando}
+        >
+          <Text style={styles.botaoSecundarioTexto}>
+            {importando ? 'Restaurando...' : 'Importar backup'}
+          </Text>
+        </Pressable>
+
+        {mensagem && <Text style={styles.mensagem}>{mensagem}</Text>}
+      </ScrollView>
+    </View>
   );
 }
 
@@ -206,31 +216,40 @@ function dataDeHoje(): string {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  wrapper: {
     flex: 1,
     backgroundColor: colors.background,
   },
+  container: {
+    flex: 1,
+  },
   conteudo: {
     padding: 24,
-    paddingTop: 80,
+    // paddingTop pequeno agora — quem reserva o espaço de "título" é o
+    // Large Title nativo, não mais um Text solto aqui dentro.
+    paddingTop: 16,
     gap: 12,
-  },
-  titulo: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.text,
   },
   texto: {
     fontSize: 14,
     color: colors.textMuted,
     lineHeight: 20,
   },
+  // Sombra sutil — mesma usada nos cartões da tela de Resumo (ver
+  // `sombraCartao` em ResumoScreen.tsx) — antes esse cartão era o único
+  // que tinha ficado de fora dessa polida, uma caixa branca totalmente
+  // chapada sem nenhuma separação do fundo creme.
   resumo: {
     backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 16,
     gap: 4,
     marginTop: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 2,
   },
   resumoTexto: {
     fontSize: 13,
@@ -238,23 +257,14 @@ const styles = StyleSheet.create({
   },
   botao: {
     marginTop: 16,
-    backgroundColor: colors.primary,
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: 'center',
   },
-  botaoTexto: {
-    color: colors.surface,
-    fontWeight: '700',
-    fontSize: 16,
-  },
+  // Sem borda/caixa aqui de propósito: ação secundária no iOS costuma ser só
+  // texto colorido (ex: "Cancelar" numa folha), não um botão contornado —
+  // isso é padrão Android (outlined button).
   botaoSecundario: {
     marginTop: 4,
     paddingVertical: 14,
-    borderRadius: 8,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.primaryDark,
   },
   botaoSecundarioTexto: {
     color: colors.primaryDark,

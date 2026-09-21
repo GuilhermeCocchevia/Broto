@@ -1,0 +1,1 @@
+ALTER TABLE `simulacoes` ADD `tipo` text DEFAULT 'compra' NOT NULL;

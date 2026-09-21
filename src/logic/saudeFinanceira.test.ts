@@ -2,6 +2,7 @@ import {
   calcularGastoPorCategoria,
   calcularTaxaDePoupanca,
   calcularComprometimentoDeRendaFixa,
+  calcularMesesDeGastoCobertos,
 } from './saudeFinanceira';
 import type { Transacao } from '../types/models';
 
@@ -104,4 +105,12 @@ test('calcularComprometimentoDeRendaFixa devolve 0 sem nenhuma entrada no mês',
   ];
 
   expect(calcularComprometimentoDeRendaFixa(transacoes, '2026-09')).toBe(0);
+});
+
+test('calcularMesesDeGastoCobertos divide o saldo pela despesa média mensal', () => {
+  expect(calcularMesesDeGastoCobertos(3000, 1000)).toBe(3);
+});
+
+test('calcularMesesDeGastoCobertos devolve 0 sem despesa nenhuma pra servir de referência', () => {
+  expect(calcularMesesDeGastoCobertos(3000, 0)).toBe(0);
 });

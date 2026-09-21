@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { colors } from '../theme/colors';
 import { OpcaoBotao } from './OpcaoBotao';
+import { CampoTexto } from './CampoTexto';
 import { normalizarTexto } from '../utils/normalizarTexto';
 import { encontrarCategoriaPorNome } from '../utils/resolverOuCriarCategoria';
 import {
@@ -96,8 +97,7 @@ export function CampoCategoria({
 
   return (
     <View>
-      <TextInput
-        style={styles.input}
+      <CampoTexto
         value={valor}
         onChangeText={(texto) => {
           onChangeValor(texto);
@@ -130,14 +130,6 @@ export function CampoCategoria({
 }
 
 const styles = StyleSheet.create({
-  input: {
-    backgroundColor: colors.surface,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    color: colors.text,
-  },
   opcoes: {
     flexDirection: 'row',
     flexWrap: 'wrap',

@@ -74,9 +74,13 @@ export function calcularComprometimentoDeRendaFixa(transacoes: Transacao[], mes:
   return despesasFixas / entradas;
 }
 
-// Total gasto no mês, somando TODAS as despesas (não só por categoria) —
-// exportada porque src/logic/reservaDeEmergencia.ts precisa dela pra
-// calcular a despesa média mensal (quantos meses de gasto o saldo cobre).
-export function calcularTotalDespesasDoMes(transacoes: Transacao[], mes: string): number {
-  return somarEntradasESaidas(transacoes, mes).saidas;
+// Quantos meses de despesa um saldo cobre — usada pra colorir o gráfico e a
+// tabela de meses do Simulador (ver corDoSaldo em corPorValor.ts,
+// GraficoSaldo.tsx e PainelViabilidade.tsx): "nesse ritmo de gasto, quanto
+// tempo esse saldo aguentaria?". Sem despesa nenhuma pra servir de
+// referência não dá pra calcular uma proporção — devolve 0 em vez de
+// Infinity, que quebraria a cor calculada em cima disso.
+export function calcularMesesDeGastoCobertos(saldo: number, despesaMediaMensal: number): number {
+  if (despesaMediaMensal <= 0) return 0;
+  return saldo / despesaMediaMensal;
 }
