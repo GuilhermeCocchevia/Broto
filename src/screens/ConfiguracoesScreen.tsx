@@ -133,6 +133,28 @@ export default function ConfiguracoesScreen() {
         </View>
 
         <View style={styles.secao}>
+          <Text style={styles.secaoTitulo}>Conquistas e tutorial</Text>
+          <Pressable
+            style={styles.botaoLinha}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              navigation.navigate('Conquistas');
+            }}
+          >
+            <Text style={styles.botaoLinhaTexto}>Ver conquistas</Text>
+          </Pressable>
+          <Pressable
+            style={styles.botaoLinha}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              navigation.navigate('Tutorial');
+            }}
+          >
+            <Text style={styles.botaoLinhaTexto}>Ver tutorial novamente</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.secao}>
           <Text style={styles.secaoTitulo}>Sobre</Text>
           <Text style={styles.itemDescricao}>
             {appJson.expo.name} · versão {appJson.expo.version}

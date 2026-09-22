@@ -71,6 +71,13 @@
       "when": 1789693036579,
       "tag": "0009_married_boom_boom",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1790085712970,
+      "tag": "0010_glorious_magma",
+      "breakpoints": true
     }
   ]
 }

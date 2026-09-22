@@ -94,6 +94,22 @@ export const metasReserva = sqliteTable('metas_reserva', {
   criadoEm: text('criado_em').notNull(),
 });
 
+// Insert-only, mesmo padrão de saldosIniciais/metasReserva: cada linha é "o
+// usuário desbloqueou essa conquista nesse momento". Sem FK (a conquista não
+// referencia nada) e sem índice único em `chave` — o código já garante não
+// desbloquear a mesma conquista duas vezes antes de inserir (ver
+// useConquistasStore.ts), mesma filosofia de `resolverOuCriarCategoria`, que
+// também checa antes de inserir em vez de confiar numa constraint do banco.
+// Fica de fora do backup/restauração de propósito (ver backup.ts): é só um
+// registro de "já comemoramos essa" — inteiramente RE-DERIVÁVEL a qualquer
+// momento a partir de transacoes/simulacoes (ver logic/conquistas.ts), então
+// não é dado que precise ser preservado com o mesmo cuidado do dinheiro real.
+export const conquistasDesbloqueadas = sqliteTable('conquistas_desbloqueadas', {
+  id: text('id').primaryKey(),
+  chave: text('chave').notNull(),
+  desbloqueadaEm: text('desbloqueada_em').notNull(),
+});
+
 // Diferente de tudo acima: é o ÚNICO lugar do banco que NÃO é insert-only —
 // preferência de app (não dado financeiro) não precisa de histórico, é só
 // "o estado atual". Sempre uma linha só, com `id` fixo (ver
@@ -119,6 +135,12 @@ export const configuracoes = sqliteTable('configuracoes', {
   // `null` (nunca definido) é o estado de quem abre o app pela primeira vez
   // depois dessa coluna existir.
   curiosidadeIndice: integer('curiosidade_indice'),
+  // "Já viu (ou pulou) o tutorial inicial?" — mesmo padrão de
+  // naoMostrarAvisoAposentadoria: precisa persistir de verdade, senão o
+  // tutorial reabriria sozinho toda vez que o app é aberto de novo. Ver
+  // TutorialScreen.tsx e o useEffect em DashboardScreen.tsx que decide
+  // quando abrir automaticamente.
+  tutorialConcluido: integer('tutorial_concluido', { mode: 'boolean' }).notNull().default(false),
 });
 
 // Mesmo padrão singleton-upsert de `configuracoes` (uma linha só, id fixo)

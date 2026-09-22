@@ -7,6 +7,7 @@ import { Poppins_700Bold } from '@expo-google-fonts/poppins';
 import { db } from './src/db/client';
 import migrations from './drizzle/migrations';
 import RootNavigator from './src/navigation/RootNavigator';
+import { ConquistasGlobais } from './src/components/ConquistasGlobais';
 
 export default function App() {
   // useMigrations roda as migrações SQL (criar tabelas etc.) toda vez que o app abre.
@@ -39,6 +40,7 @@ export default function App() {
     <SafeAreaProvider>
       <StatusBar style="auto" />
       <RootNavigator />
+      <ConquistasGlobais />
     </SafeAreaProvider>
   );
 }

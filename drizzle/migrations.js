@@ -11,6 +11,7 @@ import m0006 from './0006_black_randall_flagg.sql';
 import m0007 from './0007_short_mesmero.sql';
 import m0008 from './0008_demonic_arachne.sql';
 import m0009 from './0009_married_boom_boom.sql';
+import m0010 from './0010_glorious_magma.sql';
 
   export default {
     journal,
@@ -24,7 +25,8 @@ m0005,
 m0006,
 m0007,
 m0008,
-m0009
+m0009,
+m0010
     }
   }
   

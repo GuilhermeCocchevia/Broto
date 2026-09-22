@@ -78,21 +78,46 @@ export default function DashboardScreen() {
   // Array vazio de dependências = roda só uma vez, quando a tela monta na tela
   // (igual componentDidMount das classes antigas do React).
   useEffect(() => {
-    carregarCategorias();
-    carregarTransacoes();
-    carregarSaldoInicial();
+    const prontoCategorias = carregarCategorias();
+    const prontoTransacoes = carregarTransacoes();
+    const prontoSaldo = carregarSaldoInicial();
     carregarSimulacoes();
+    const prontoConfiguracoes = carregarConfiguracoes();
+
     // `.then()` (não um valor capturado por `useConfiguracoesStore(seletor)`
     // no topo do componente): a curiosidade sorteada precisa do
     // `curiosidadeIndice` (a última mostrada) já carregado do banco — ler
     // um valor de store por seletor aqui correria o risco de pegar o `null`
     // inicial, antes do carregamento assíncrono terminar (mesma corrida já
     // resolvida em NovaSimulacaoScreen.tsx, ver comentário lá).
-    carregarConfiguracoes().then(() => {
+    prontoConfiguracoes.then(() => {
       const indiceAnterior = useConfiguracoesStore.getState().curiosidadeIndice;
       const indiceEscolhido = escolherProximaCuriosidade(curiosidadesInvestimento.length, indiceAnterior);
       setCuriosidade(curiosidadesInvestimento[indiceEscolhido]);
       atualizarCuriosidadeIndice(indiceEscolhido);
+    });
+
+    // Tutorial automático SÓ pra quem abre o app com o banco genuinamente
+    // vazio (primeira instalação de verdade) — nunca pra quem já tem dado
+    // real, mesmo que ainda não tenha "concluído" o tutorial (ex: alguém
+    // que restaurou um backup antigo, de antes dessa coluna existir, não
+    // pode ser recebido com um tutorial do zero). `Promise.all` espera os 4
+    // carregamentos terminarem antes de checar — ler as stores direto por
+    // `getState()` (não pelos valores capturados no topo do componente,
+    // que podem estar desatualizados neste exato instante) evita a mesma
+    // corrida do comentário acima.
+    Promise.all([prontoCategorias, prontoTransacoes, prontoSaldo, prontoConfiguracoes]).then(() => {
+      const appEstaVazio =
+        useCategoriasStore.getState().categorias.length === 0 &&
+        useTransacoesStore.getState().transacoes.length === 0 &&
+        useSaldoInicialStore.getState().saldosIniciais.length === 0;
+      if (appEstaVazio && !useConfiguracoesStore.getState().tutorialConcluido) {
+        // `.replace` (não `.navigate`): a pessoa ainda não "chegou" ao
+        // Dashboard de verdade — o Tutorial toma o lugar dele na pilha, não
+        // empilha por cima (senão o botão de voltar do Tutorial devolveria
+        // pra um Dashboard vazio no meio da apresentação).
+        navigation.replace('Tutorial');
+      }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [carregarCategorias, carregarTransacoes, carregarSaldoInicial, carregarSimulacoes, carregarConfiguracoes]);

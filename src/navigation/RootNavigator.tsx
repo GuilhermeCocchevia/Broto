@@ -15,6 +15,8 @@ import RevisarGastosScreen from '../screens/RevisarGastosScreen';
 import ResumoScreen from '../screens/ResumoScreen';
 import BackupScreen from '../screens/BackupScreen';
 import ConfiguracoesScreen from '../screens/ConfiguracoesScreen';
+import TutorialScreen from '../screens/TutorialScreen';
+import ConquistasScreen from '../screens/ConquistasScreen';
 import type { TipoSimulacao } from '../types/models';
 
 export type RootStackParamList = {
@@ -51,6 +53,8 @@ export type RootStackParamList = {
   DetalheSimulacao: { id: string };
   CompararSimulacoes: undefined;
   AtualizarSaldo: undefined;
+  Tutorial: undefined;
+  Conquistas: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -177,6 +181,20 @@ export default function RootNavigator() {
           name="Configuracoes"
           component={ConfiguracoesScreen}
           options={{ title: 'Configurações' }}
+        />
+        {/* Sem cabeçalho nativo (igual Dashboard) — o próprio Tutorial
+            desenha seu cabeçalho (pontinhos de progresso + "Pular"), um
+            cabeçalho nativo por cima seria redundante e ainda mostraria uma
+            seta de voltar que não faz sentido aqui. */}
+        <Stack.Screen
+          name="Tutorial"
+          component={TutorialScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="Conquistas"
+          component={ConquistasScreen}
+          options={{ title: 'Conquistas', headerLargeTitle: true }}
         />
       </Stack.Navigator>
     </NavigationContainer>

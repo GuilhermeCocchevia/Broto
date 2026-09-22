@@ -14,17 +14,20 @@ type ConfiguracoesState = {
   reduzirAnimacoes: boolean;
   naoMostrarAvisoAposentadoria: boolean;
   curiosidadeIndice: number | null;
+  tutorialConcluido: boolean;
   carregando: boolean;
   carregar: () => Promise<void>;
   atualizarReduzirAnimacoes: (valor: boolean) => Promise<void>;
   atualizarNaoMostrarAvisoAposentadoria: (valor: boolean) => Promise<void>;
   atualizarCuriosidadeIndice: (indice: number) => Promise<void>;
+  atualizarTutorialConcluido: (valor: boolean) => Promise<void>;
 };
 
 export const useConfiguracoesStore = create<ConfiguracoesState>()((set) => ({
   reduzirAnimacoes: false,
   naoMostrarAvisoAposentadoria: false,
   curiosidadeIndice: null,
+  tutorialConcluido: false,
   carregando: false,
 
   carregar: async () => {
@@ -34,6 +37,7 @@ export const useConfiguracoesStore = create<ConfiguracoesState>()((set) => ({
       reduzirAnimacoes: linha?.reduzirAnimacoes ?? false,
       naoMostrarAvisoAposentadoria: linha?.naoMostrarAvisoAposentadoria ?? false,
       curiosidadeIndice: linha?.curiosidadeIndice ?? null,
+      tutorialConcluido: linha?.tutorialConcluido ?? false,
       carregando: false,
     });
   },
@@ -64,5 +68,13 @@ export const useConfiguracoesStore = create<ConfiguracoesState>()((set) => ({
       .insert(configuracoes)
       .values({ id: ID_CONFIGURACOES, curiosidadeIndice: indice })
       .onConflictDoUpdate({ target: configuracoes.id, set: { curiosidadeIndice: indice } });
+  },
+
+  atualizarTutorialConcluido: async (valor) => {
+    set({ tutorialConcluido: valor });
+    await db
+      .insert(configuracoes)
+      .values({ id: ID_CONFIGURACOES, tutorialConcluido: valor })
+      .onConflictDoUpdate({ target: configuracoes.id, set: { tutorialConcluido: valor } });
   },
 }));

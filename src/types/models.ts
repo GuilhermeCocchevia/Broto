@@ -133,3 +133,15 @@ export type MetaReserva = {
   valorAlvo: number | null;
   criadoEm: string;
 };
+
+// Insert-only, mesma ideia de SaldoInicial: cada linha é "o usuário
+// desbloqueou essa conquista nesse momento" (ver logic/conquistas.ts pro
+// catálogo de conquistas e a lógica que decide quais já foram alcançadas).
+// `chave` é `string` solta aqui (não a union ChaveConquista) de propósito:
+// models.ts não depende de nenhum catálogo específico, só do FORMATO da
+// linha — a validação de "é uma chave conhecida?" mora em conquistas.ts.
+export type ConquistaDesbloqueada = {
+  id: string;
+  chave: string;
+  desbloqueadaEm: string;
+};
