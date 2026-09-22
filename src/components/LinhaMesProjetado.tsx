@@ -6,6 +6,19 @@ import { formatarReal } from '../utils/formatarReal';
 import type { MesProjetado } from '../logic/projecao';
 import { formatarMesBr } from '../utils/formatarDataBr';
 
+// Cabeçalho da tabela de meses: diz o que cada número é. Sem ele, o valor da
+// direita (saldo ACUMULADO, que soma a sobra de todos os meses até ali) era lido
+// como "quanto sobra no mês" e parecia dar saltos sem explicação.
+export function CabecalhoDosMeses() {
+  return (
+    <View style={styles.cabecalho}>
+      <Text style={styles.rotulo}>Entra</Text>
+      <Text style={styles.rotulo}>Sai</Text>
+      <Text style={styles.rotulo}>Saldo acumulado</Text>
+    </View>
+  );
+}
+
 // Uma linha de mês projetado (entradas, saídas, saldo acumulado) — extraída
 // daqui (em vez de ficar direta no `.map()` de quem usa) porque o brilho
 // embaixo da linha precisa de um id de gradiente PRÓPRIO por instância
@@ -20,7 +33,12 @@ export function LinhaMesProjetado({ item, cor }: { item: MesProjetado; cor: stri
   const idGradiente = useId();
   return (
     <View style={styles.linha}>
-      <Text style={styles.mes}>{formatarMesBr(item.mes)}</Text>
+      <View style={styles.topo}>
+        <Text style={styles.mes}>{formatarMesBr(item.mes)}</Text>
+        {/* O que sobra SÓ nesse mês (entra − sai) — é o número que se compara
+            com a sobra do Dashboard, diferente do saldo acumulado à direita. */}
+        <Text style={styles.sobraDoMes}>sobra no mês: {formatarReal(item.entradas - item.saidas)}</Text>
+      </View>
       <View style={styles.valores}>
         <Text style={styles.entradas}>+{formatarReal(item.entradas)}</Text>
         <Text style={styles.saidas}>-{formatarReal(item.saidas)}</Text>
@@ -55,6 +73,24 @@ const styles = StyleSheet.create({
     left: '50%',
     marginLeft: -110,
     bottom: -6,
+  },
+  cabecalho: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  rotulo: {
+    fontSize: 11,
+    color: colors.textMuted,
+  },
+  topo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+  },
+  sobraDoMes: {
+    fontSize: 12,
+    color: colors.textMuted,
   },
   mes: {
     fontSize: 16,

@@ -199,6 +199,7 @@ export default function DetalheSimulacaoScreen() {
                 reducaoPct={reducaoPct}
                 onChange={setReducaoPct}
                 gastoDoDiaADia={premissas.gastoDoDiaADia}
+                mesAtual={estimativa.mesAtual}
               />
               <PremissasDaProjecao premissas={premissas} />
             </>

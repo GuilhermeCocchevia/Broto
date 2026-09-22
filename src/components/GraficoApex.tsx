@@ -64,6 +64,7 @@ export function GraficoApex({
       mesesPesado,
       rotuloPesado: `Com ${Math.round((FATOR_IMPREVISTOS - 1) * 100)}% a mais no dia a dia`,
       corLinha,
+      corAlta: colors.primary,
       tema: { texto: colors.text, textoSuave: colors.textMuted, linhaGrade: 'rgba(141, 110, 99, 0.2)' },
       altura: ALTURA,
     });

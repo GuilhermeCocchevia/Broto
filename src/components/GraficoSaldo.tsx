@@ -138,7 +138,9 @@ function GraficoSaldoNativo({ saldoAtual, meses, mesesPesado }: PropsDoGrafico) 
   const segmentosDaLinha = pontos.slice(1).map((ponto, indice) => ({
     startIndex: indice,
     endIndex: indice + 1,
-    color: ponto.dataPointColor,
+    // Trecho em que o saldo SOBE fica verde (como no gráfico do Apex); nos
+    // outros vale a cor de "saúde" do ponto.
+    color: ponto.valorReal > pontos[indice].valorReal ? colors.primary : ponto.dataPointColor,
   }));
 
   // Área/linha "de base" usam a cor do PIOR mês da série inteira — dá o

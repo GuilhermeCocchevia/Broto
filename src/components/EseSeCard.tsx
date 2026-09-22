@@ -3,6 +3,7 @@ import { colors } from '../theme/colors';
 import { OpcaoBotao } from './OpcaoBotao';
 import { formatarReal } from '../utils/formatarReal';
 import { descreverEseSe } from '../logic/cenariosDeProjecao';
+import { formatarMesBr } from '../utils/formatarDataBr';
 import type { Cenarios } from '../hooks/useCenarios';
 
 // Cortes de gasto oferecidos sempre; se o "corte necessário" pra meta caber
@@ -23,12 +24,15 @@ export function EseSeCard({
   reducaoPct,
   onChange,
   gastoDoDiaADia,
+  mesAtual,
 }: {
   cenarios: Cenarios;
   reducaoPct: number;
   onChange: (percentual: number) => void;
   // Gasto do dia a dia estimado por mês (ver PremissasDeProjecao) — a base do "quanto economizo".
   gastoDoDiaADia: number;
+  // Mês de hoje ('AAAA-MM'): o gasto dele já aconteceu, então o corte só vale dali em diante.
+  mesAtual: string;
 }) {
   const { corteNecessario } = cenarios;
 
@@ -69,6 +73,11 @@ export function EseSeCard({
           esperado: cenarios.esperado,
         })}
       </Text>
+      {reducaoPct > 0 && cenarios.esperado.meses.some((mes) => mes.mes === mesAtual) && (
+        <Text style={styles.nota}>
+          O corte vale a partir do mês seguinte: {formatarMesBr(mesAtual)} já está com os gastos lançados e não muda.
+        </Text>
+      )}
     </View>
   );
 }
@@ -101,6 +110,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+  },
+  nota: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.textMuted,
   },
   resultado: {
     fontSize: 14,

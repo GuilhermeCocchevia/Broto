@@ -5,7 +5,7 @@ import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import { colors } from '../theme/colors';
 import { GraficoSaldo } from './GraficoSaldo';
-import { LinhaMesProjetado } from './LinhaMesProjetado';
+import { CabecalhoDosMeses, LinhaMesProjetado } from './LinhaMesProjetado';
 import { corDoSaldo } from '../utils/corPorValor';
 import { calcularMesesDeGastoCobertos } from '../logic/saudeFinanceira';
 import type { MesProjetado, ResultadoViabilidade } from '../logic/projecao';
@@ -99,6 +99,7 @@ export function PainelViabilidade({
       {aposGrafico}
 
       <View style={styles.lista}>
+        <CabecalhoDosMeses />
         {resultado.meses.map((item) => (
           <LinhaMesProjetado
             key={item.mes}

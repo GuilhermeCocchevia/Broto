@@ -22,8 +22,10 @@ export type EntradaDoGrafico = {
   // Cenário mais pesado (linha tracejada). Ausente = só o esperado.
   mesesPesado?: MesProjetado[];
   rotuloPesado?: string;
-  // Cor da linha/área principal — a "saúde" do pior saldo (ver corDoSaldo).
+  // Cor dos trechos em QUEDA — a "saúde" do pior saldo (ver corDoSaldo).
   corLinha: string;
+  // Cor dos trechos em ALTA (o saldo passa a subir): verde.
+  corAlta: string;
   tema: TemaDoGrafico;
   altura: number;
 };
@@ -47,8 +49,51 @@ function montarCategorias(meses: MesProjetado[]): string[] {
   return ['Hoje', ...rotulos];
 }
 
+// Pra cada segmento entre dois pontos consecutivos: o saldo SOBE (true) ou cai
+// (false)? Segmento sem variação (saldo igual) herda a direção do anterior —
+// ou, no começo da série, a do primeiro segmento que varia; série toda parada
+// conta como queda. Assim uma linha reta e horizontal não "pisca" de cor.
+export function direcaoDosSegmentos(valores: number[]): boolean[] {
+  const direcoes: (boolean | null)[] = [];
+  for (let i = 0; i < valores.length - 1; i++) {
+    const variacao = valores[i + 1] - valores[i];
+    direcoes.push(variacao === 0 ? null : variacao > 0);
+  }
+  for (let i = 1; i < direcoes.length; i++) if (direcoes[i] === null) direcoes[i] = direcoes[i - 1];
+  for (let i = direcoes.length - 2; i >= 0; i--) if (direcoes[i] === null) direcoes[i] = direcoes[i + 1];
+  return direcoes.map((subindo) => subindo === true);
+}
+
+export type ParadaDeCor = { offset: number; color: string; opacity: number };
+
+// As paradas do gradiente HORIZONTAL do traço: a linha muda de cor exatamente
+// no ponto onde a direção muda (cor de queda até ali, verde depois, e assim por
+// diante, qualquer número de viradas). Cada ponto i fica na posição i/(n-1) da
+// largura da linha; a troca de cor é uma borda dura (duas paradas no mesmo
+// offset). O ApexCharts não colore uma linha por trecho de outro jeito — duas
+// séries (queda/alta) se sobrepunham quando uma alta durava um segmento só.
+export function montarParadasDeCor(direcoes: boolean[], corQueda: string, corAlta: string): ParadaDeCor[] {
+  const corDoSegmento = (subindo: boolean) => (subindo ? corAlta : corQueda);
+  if (direcoes.length === 0) {
+    return [
+      { offset: 0, color: corQueda, opacity: 1 },
+      { offset: 100, color: corQueda, opacity: 1 },
+    ];
+  }
+  const paradas: ParadaDeCor[] = [{ offset: 0, color: corDoSegmento(direcoes[0]), opacity: 1 }];
+  direcoes.forEach((subindo, i) => {
+    if (i > 0 && subindo !== direcoes[i - 1]) {
+      const offset = Math.round((i / direcoes.length) * 10000) / 100;
+      paradas.push({ offset, color: corDoSegmento(direcoes[i - 1]), opacity: 1 });
+      paradas.push({ offset, color: corDoSegmento(subindo), opacity: 1 });
+    }
+  });
+  paradas.push({ offset: 100, color: corDoSegmento(direcoes[direcoes.length - 1]), opacity: 1 });
+  return paradas;
+}
+
 export function montarOpcoesApex(entrada: EntradaDoGrafico): Record<string, unknown> {
-  const { saldoAtual, meses, mesesPesado, corLinha, tema, altura } = entrada;
+  const { saldoAtual, meses, mesesPesado, corLinha, corAlta, tema, altura } = entrada;
   const categorias = montarCategorias(meses);
   const esperado = [saldoAtual, ...meses.map((m) => m.saldo)].map(arredondar);
   const pesado = mesesPesado ? [saldoAtual, ...mesesPesado.map((m) => m.saldo)].map(arredondar) : undefined;
@@ -63,10 +108,29 @@ export function montarOpcoesApex(entrada: EntradaDoGrafico): Record<string, unkn
   const menorValor = Math.min(...todosOsValores);
   const temNegativo = menorValor < 0;
 
-  const series: Record<string, unknown>[] = [{ name: 'Saldo esperado', type: 'area', data: esperado }];
+  // A linha do saldo esperado muda de cor conforme a direção (cai → cor de saúde,
+  // sobe → verde) por um gradiente horizontal no traço (ver montarParadasDeCor).
+  // Por baixo dela, uma área neutra e translúcida (só o "chão" visual — colorir a
+  // área por trecho brigaria com o gradiente do traço, que é compartilhado).
+  const direcoes = direcaoDosSegmentos(esperado);
+  const paradasDeCor = montarParadasDeCor(direcoes, corLinha, corAlta);
+  // Cor do ponto (marcador e tooltip): a do segmento que CHEGA nele; o primeiro
+  // ponto usa a do primeiro segmento.
+  const coresDosPontos = esperado.map((_, i) => {
+    const subindo = direcoes.length === 0 ? false : direcoes[Math.max(0, i - 1)];
+    return subindo ? corAlta : corLinha;
+  });
+
+  const series: Record<string, unknown>[] = [
+    { name: 'Saldo esperado', type: 'area', data: esperado },
+    { name: 'Saldo esperado', type: 'line', data: esperado },
+  ];
   if (pesado) {
     series.push({ name: entrada.rotuloPesado ?? 'Cenário mais pesado', type: 'line', data: pesado });
   }
+  // A legenda (só quando há a linha tracejada) é um texto no HTML, abaixo do
+  // gráfico — ocupa esta altura, que sai do gráfico.
+  const alturaDaLegenda = pesado ? 24 : 0;
 
   const estiloDoTexto = { colors: tema.textoSuave, fontSize: '10px' };
 
@@ -101,10 +165,18 @@ export function montarOpcoesApex(entrada: EntradaDoGrafico): Record<string, unkn
 
   return {
     passoDosRotulos,
+    // Dados pro tooltip personalizado do HTML e pra legenda do cenário pesado.
+    dadosDoTooltip: {
+      categorias,
+      esperado,
+      cores: coresDosPontos,
+      pesado: pesado ?? null,
+      rotuloPesado: entrada.rotuloPesado ?? 'Cenário mais pesado',
+    },
     series,
     chart: {
       type: 'line',
-      height: altura,
+      height: altura - alturaDaLegenda,
       background: 'transparent',
       fontFamily: '-apple-system, system-ui, Roboto, sans-serif',
       foreColor: tema.textoSuave,
@@ -113,19 +185,30 @@ export function montarOpcoesApex(entrada: EntradaDoGrafico): Record<string, unkn
       zoom: { enabled: false },
       animations: { enabled: true, speed: 500, animateGradually: { enabled: false } },
     },
-    colors: [corLinha, tema.textoSuave],
+    // A cor da linha do saldo vem do gradiente (fill abaixo); a de `colors` só
+    // vale de reserva. Séries: [área neutra, linha do saldo, (linha tracejada)].
+    colors: [tema.textoSuave, corAlta, tema.textoSuave],
     // monotoneCubic (não 'smooth'): a curva suave comum "passa do ponto" e
     // faz ondulações num crescimento reto; esta nunca sai do intervalo dos dados.
-    stroke: { curve: 'monotoneCubic', width: [3, 2], dashArray: [0, 6] },
+    stroke: { curve: 'monotoneCubic', width: [0, 3, 2], dashArray: [0, 0, 6] },
     fill: {
-      type: ['gradient', 'solid'],
-      gradient: { shade: 'light', shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.02, stops: [0, 100] },
+      type: ['solid', 'gradient', 'solid'],
+      opacity: [0.1, 1, 1],
+      gradient: { type: 'horizontal', colorStops: paradasDeCor },
     },
     markers: {
-      size: [4, 0],
+      size: [0, 4, 0],
       strokeColors: '#FFFFFF',
       strokeWidth: 2,
       hover: { size: 6 },
+      // Cada ponto na cor do trecho que chega nele.
+      discrete: coresDosPontos.map((cor, i) => ({
+        seriesIndex: 1,
+        dataPointIndex: i,
+        fillColor: cor,
+        strokeColor: '#FFFFFF',
+        size: 4,
+      })),
     },
     dataLabels: { enabled: false },
     grid: {
@@ -144,14 +227,8 @@ export function montarOpcoesApex(entrada: EntradaDoGrafico): Record<string, unkn
       forceNiceScale: true,
       labels: { style: estiloDoTexto },
     },
-    legend: {
-      show: Boolean(pesado),
-      position: 'bottom',
-      horizontalAlign: 'left',
-      fontSize: '12px',
-      labels: { colors: tema.textoSuave },
-      markers: { size: 5, shape: 'circle' },
-    },
+    // A legenda do cenário pesado é um texto no HTML (ver htmlDoGrafico.ts).
+    legend: { show: false },
     tooltip: { shared: true, intersect: false, theme: 'light' },
     annotations: {
       yaxis: [

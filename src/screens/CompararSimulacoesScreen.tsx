@@ -193,6 +193,7 @@ export default function CompararSimulacoesScreen() {
                   reducaoPct={reducaoPct}
                   onChange={setReducaoPct}
                   gastoDoDiaADia={premissas.gastoDoDiaADia}
+                mesAtual={estimativa.mesAtual}
                 />
                 <PremissasDaProjecao premissas={premissas} />
               </>

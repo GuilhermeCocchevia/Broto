@@ -24,10 +24,14 @@ export function montarHtmlDoGrafico(opcoes: Record<string, unknown>, apexJs: str
     -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
     -webkit-tap-highlight-color: transparent; }
   #grafico { width: 100%; }
+  #legenda { height: 24px; display: flex; align-items: center; gap: 8px; padding-left: 8px;
+    font: 12px -apple-system, system-ui, Roboto, sans-serif; color: #8D6E63; }
+  #legenda .tracejado { width: 22px; border-top: 2px dashed #8D6E63; }
 </style>
 </head>
 <body>
 <div id="grafico"></div>
+<div id="legenda" style="display:none"></div>
 <script>${apexJs}</script>
 <script>
 (function () {
@@ -44,13 +48,35 @@ export function montarHtmlDoGrafico(opcoes: Record<string, unknown>, apexJs: str
     return i % passo === 0 ? valor : '';
   };
   delete opcoes.passoDosRotulos;
-  opcoes.tooltip.y = { formatter: function (v) { return moeda.format(v); } };
+  // Tooltip próprio (uma linha por ponto): as séries de queda e de alta
+  // dividem o ponto de virada, e o tooltip padrão mostraria esse ponto duas vezes.
+  var dt = opcoes.dadosDoTooltip;
+  delete opcoes.dadosDoTooltip;
+  opcoes.tooltip.custom = function (ctx) {
+    var i = ctx.dataPointIndex;
+    var linha = function (cor, rotulo, valor) {
+      return '<div style="display:flex;align-items:center;gap:6px;margin-top:3px">' +
+        '<span style="width:8px;height:8px;border-radius:50%;background:' + cor + '"></span>' +
+        '<span>' + rotulo + ': <b>' + moeda.format(valor) + '</b></span></div>';
+    };
+    var html = '<div style="padding:6px 10px;font-size:12px;color:#3E2723">' +
+      '<div style="font-weight:700">' + dt.categorias[i] + '</div>' +
+      linha(dt.cores[i], 'Saldo esperado', dt.esperado[i]);
+    if (dt.pesado) html += linha('#8D6E63', dt.rotuloPesado, dt.pesado[i]);
+    return html + '</div>';
+  };
   // Só avisa o app DEPOIS do primeiro desenho.
   opcoes.chart.events = {
     mounted: function () {
       if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage('pronto');
     }
   };
+  if (dt.pesado) {
+    var legenda = document.getElementById('legenda');
+    legenda.style.display = 'flex';
+    legenda.innerHTML = '<span class="tracejado"></span><span></span>';
+    legenda.lastChild.textContent = dt.rotuloPesado;
+  }
   new ApexCharts(document.getElementById('grafico'), opcoes).render();
 })();
 </script>
