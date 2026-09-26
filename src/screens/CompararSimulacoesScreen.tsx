@@ -12,17 +12,20 @@ import { EseSeCard } from '../components/EseSeCard';
 import { usePremissasDeProjecao } from '../hooks/usePremissasDeProjecao';
 import { useCenarios } from '../hooks/useCenarios';
 import {
+  descreverOndeCorta,
   montarAvisoDeFolga,
   sugestaoParaMetaDeGuardar,
   temFaixaDeCenarios,
   type Avaliador,
 } from '../logic/cenariosDeProjecao';
+import { useCategoriasStore } from '../store/useCategoriasStore';
 import { useTransacoesStore } from '../store/useTransacoesStore';
 import { useSimulacoesStore } from '../store/useSimulacoesStore';
 import { useSaldoInicialStore } from '../store/useSaldoInicialStore';
 import { avaliarViabilidadeConjunta, calcularParcelaEfetiva } from '../logic/projecao';
 import { formatarReal } from '../utils/formatarReal';
 import { formatarMesBr } from '../utils/formatarDataBr';
+import { useCategoriaPorId } from '../hooks/useCategoriaPorId';
 
 // "Dá pra fazer essa compra E bater essa meta de economia ao mesmo tempo,
 // com o que eu realmente ganho e gasto?" — escolha 2 ou mais simulações
@@ -30,6 +33,8 @@ import { formatarMesBr } from '../utils/formatarDataBr';
 // só uma de cada vez (ver DetalheSimulacaoScreen, que faz a mesma pergunta
 // só que pra uma simulação isolada).
 export default function CompararSimulacoesScreen() {
+  const carregarCategorias = useCategoriasStore((state) => state.carregar);
+  const categoriaPorId = useCategoriaPorId();
   const transacoes = useTransacoesStore((state) => state.transacoes);
   const carregarTransacoes = useTransacoesStore((state) => state.carregar);
   const simulacoes = useSimulacoesStore((state) => state.simulacoes);
@@ -39,10 +44,11 @@ export default function CompararSimulacoesScreen() {
   const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
 
   useEffect(() => {
+    carregarCategorias();
     carregarTransacoes();
     carregarSimulacoes();
     carregarSaldoInicial();
-  }, [carregarTransacoes, carregarSimulacoes, carregarSaldoInicial]);
+  }, [carregarCategorias, carregarTransacoes, carregarSimulacoes, carregarSaldoInicial]);
 
   function alternarSelecao(id: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -74,7 +80,7 @@ export default function CompararSimulacoesScreen() {
     return (estimativaAvaliada) =>
       avaliarViabilidadeConjunta(simulacoesEscolhidas, transacoes, saldoAtual, rendaFixaMensal, estimativaAvaliada);
   }, [simulacoesEscolhidas, transacoes, saldoAtual, rendaFixaMensal]);
-  const { cenarios, reducaoPct, setReducaoPct } = useCenarios(estimativa, avaliar);
+  const { cenarios, reducaoPct, setReducaoPct, foco, setFoco } = useCenarios(estimativa, avaliar);
   const resultado = cenarios?.esperado ?? null;
 
   // Só quando TODAS as escolhidas são metas de guardar (economia,
@@ -99,7 +105,8 @@ export default function CompararSimulacoesScreen() {
   const mensagens = useMemo(() => {
     if (!resultado || !cenarios) return null;
     const nomes = simulacoesEscolhidas.map((s) => `"${s.descricao}"`).join(' + ');
-    const comEseSe = reducaoPct > 0 ? `Com ${reducaoPct}% a menos no dia a dia, ` : '';
+    const ondeCorta = descreverOndeCorta(foco.tipo === 'categoria' ? categoriaPorId.get(foco.categoriaId)?.nome : undefined);
+    const comEseSe = reducaoPct > 0 ? `Com ${reducaoPct}% a menos ${ondeCorta}, ` : '';
     const avisoDeFolga = montarAvisoDeFolga(cenarios.esperado, cenarios.pesado);
     const situacao = `${reducaoPct > 0 ? `${comEseSe}fazendo` : 'Fazendo'} ${nomes} ao mesmo tempo, seu saldo fica negativo em ${formatarMesBr(resultado.piorMes)} (ficaria em ${formatarReal(resultado.piorSaldo)}).`;
     return {
@@ -110,7 +117,7 @@ export default function CompararSimulacoesScreen() {
         ? `${situacao.charAt(0).toUpperCase()}${situacao.slice(1)}${reducaoPct === 0 && sugestao.texto ? ` ${sugestao.texto}` : ''}`
         : `${situacao.charAt(0).toUpperCase()}${situacao.slice(1)} Talvez valha ajustar alguma delas, ou escalonar no tempo.`,
     };
-  }, [resultado, cenarios, reducaoPct, simulacoesEscolhidas, todasSaoMetaDeGuardar, sugestao]);
+  }, [resultado, cenarios, reducaoPct, foco, categoriaPorId, simulacoesEscolhidas, todasSaoMetaDeGuardar, sugestao]);
 
   return (
     <View style={styles.wrapper}>
@@ -192,8 +199,12 @@ export default function CompararSimulacoesScreen() {
                   cenarios={cenarios}
                   reducaoPct={reducaoPct}
                   onChange={setReducaoPct}
+                  estimativa={estimativa}
+                  foco={foco}
+                  onChangeFoco={setFoco}
+                  categoriaPorId={categoriaPorId}
                   gastoDoDiaADia={premissas.gastoDoDiaADia}
-                mesAtual={estimativa.mesAtual}
+                  mesAtual={estimativa.mesAtual}
                 />
                 <PremissasDaProjecao premissas={premissas} />
               </>

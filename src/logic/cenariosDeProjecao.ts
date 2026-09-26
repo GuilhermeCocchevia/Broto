@@ -7,6 +7,33 @@ import { calcularReducaoMensalNecessaria, type ResultadoViabilidade } from './pr
 import { formatarReal } from '../utils/formatarReal';
 import { formatarMesBr } from '../utils/formatarDataBr';
 
+// Uma categoria do "dia a dia" (variável OU recorrente na prática) e quanto
+// dela entra na projeção por mês — a lista que alimenta o seletor do 'e se
+// por categoria' (ver ajustarGastoDeCategoria abaixo). Uma mesma categoria
+// pode ter as duas origens (ex: parte do supermercado é variável, parte virou
+// "recorrente na prática"); somadas aqui, é uma coisa só pro usuário.
+export type ItemDoDiaADiaPorCategoria = {
+  categoriaId: string;
+  valorMensal: number;
+};
+
+export function listarItensDoDiaADiaPorCategoria(estimativa: EstimativaDeGastos): ItemDoDiaADiaPorCategoria[] {
+  const totalPorCategoria = new Map<string, number>();
+  for (const item of estimativa.gastoVariavelPorCategoria) {
+    totalPorCategoria.set(item.categoriaId, (totalPorCategoria.get(item.categoriaId) ?? 0) + item.valorMensal);
+  }
+  for (const recorrente of estimativa.recorrentesNaPratica) {
+    totalPorCategoria.set(
+      recorrente.categoriaId,
+      (totalPorCategoria.get(recorrente.categoriaId) ?? 0) + recorrente.valorMensal,
+    );
+  }
+  return [...totalPorCategoria.entries()]
+    .map(([categoriaId, valorMensal]) => ({ categoriaId, valorMensal }))
+    .filter((item) => item.valorMensal > 0)
+    .sort((a, b) => b.valorMensal - a.valorMensal);
+}
+
 // O cenário "mais pesado" assume 20% a mais de gasto no dia a dia — uma margem
 // simples e explicável pra imprevistos (não pretende prever nada: com 1 a 3
 // meses de dados, qualquer modelo mais fino seria falsa precisão).
@@ -37,6 +64,38 @@ function totalDoDiaADia(estimativa: EstimativaDeGastos): number {
   );
 }
 
+// Mesma ideia de ajustarGastoDoDiaADia, mas só na fatia de UMA categoria — o
+// resto do dia a dia (outras categorias) fica intocado. Escala tanto a parte
+// "variável" (gastoVariavelMensal E sua fatia por categoria, proporcionalmente)
+// quanto qualquer recorrente-na-prática daquela categoria. Categoria sem
+// nenhum gasto no dia a dia: devolve a estimativa igual (nada pra cortar).
+export function ajustarGastoDeCategoria(
+  estimativa: EstimativaDeGastos,
+  categoriaId: string,
+  fator: number,
+): EstimativaDeGastos {
+  const fatiaVariavel = estimativa.gastoVariavelPorCategoria.find((item) => item.categoriaId === categoriaId);
+  const corteNaVariavel = fatiaVariavel ? fatiaVariavel.valorMensal * (1 - fator) : 0;
+
+  return {
+    ...estimativa,
+    gastoVariavelMensal: Math.max(0, estimativa.gastoVariavelMensal - corteNaVariavel),
+    gastoVariavelPorCategoria: estimativa.gastoVariavelPorCategoria.map((item) =>
+      item.categoriaId === categoriaId ? { ...item, valorMensal: item.valorMensal * fator } : item,
+    ),
+    recorrentesNaPratica: estimativa.recorrentesNaPratica.map((r) =>
+      r.categoriaId === categoriaId ? { ...r, valorMensal: r.valorMensal * fator } : r,
+    ),
+  };
+}
+
+// Quanto do dia a dia estimado pertence a UMA categoria (variável + recorrente
+// na prática dela) — a base do texto do 'e se por categoria'.
+export function totalDaCategoriaNoDiaADia(estimativa: EstimativaDeGastos, categoriaId: string): number {
+  const item = listarItensDoDiaADiaPorCategoria(estimativa).find((i) => i.categoriaId === categoriaId);
+  return item?.valorMensal ?? 0;
+}
+
 // Menor corte (em % inteira, 1 a 100) no gasto do dia a dia que faz a
 // avaliação ficar viável. 0 se já é viável; `null` se nem cortando tudo
 // resolve (as despesas fixas sozinhas já não cabem) ou se não há gasto do dia
@@ -63,6 +122,32 @@ export function calcularCorteNecessarioEmPercentual(
   return alto;
 }
 
+// Mesma busca por bisseção de calcularCorteNecessarioEmPercentual, mas
+// cortando só a fatia de UMA categoria (as outras ficam como estão). `null`
+// nos mesmos dois casos: nem zerando a categoria resolve, ou ela não tem
+// nada no dia a dia pra cortar.
+export function calcularCorteNecessarioEmCategoria(
+  avaliar: Avaliador,
+  estimativa: EstimativaDeGastos,
+  categoriaId: string,
+): number | null {
+  if (avaliar(estimativa).viavel) return 0;
+  if (totalDaCategoriaNoDiaADia(estimativa, categoriaId) <= 0) return null;
+
+  const cabeCortando = (percentual: number) =>
+    avaliar(ajustarGastoDeCategoria(estimativa, categoriaId, 1 - percentual / 100)).viavel;
+  if (!cabeCortando(100)) return null;
+
+  let baixo = 1;
+  let alto = 100;
+  while (baixo < alto) {
+    const meio = Math.floor((baixo + alto) / 2);
+    if (cabeCortando(meio)) alto = meio;
+    else baixo = meio + 1;
+  }
+  return alto;
+}
+
 // Por que nem cortando o gasto do dia a dia a meta cabe:
 //  - 'mes-atual': o pior mês é o ATUAL, cujo gasto real já foi lançado —
 //    cortar o dia a dia dos próximos meses não muda o que já aconteceu (dá pra
@@ -73,6 +158,78 @@ export type MotivoSemSolucao = 'mes-atual' | 'fixos';
 export function explicarSemSolucao(avaliar: Avaliador, estimativa: EstimativaDeGastos): MotivoSemSolucao {
   const semDiaADia = avaliar(ajustarGastoDoDiaADia(estimativa, 0));
   return semDiaADia.piorMes === estimativa.mesAtual ? 'mes-atual' : 'fixos';
+}
+
+// Mesma pergunta de explicarSemSolucao, só que zerando uma categoria só.
+export function explicarSemSolucaoNaCategoria(
+  avaliar: Avaliador,
+  estimativa: EstimativaDeGastos,
+  categoriaId: string,
+): MotivoSemSolucao {
+  const semACategoria = avaliar(ajustarGastoDeCategoria(estimativa, categoriaId, 0));
+  return semACategoria.piorMes === estimativa.mesAtual ? 'mes-atual' : 'fixos';
+}
+
+// O que o "e se" está cortando: o dia a dia inteiro, ou só uma categoria
+// dele (ver EseSeCard).
+export type FocoDoCorte = { tipo: 'geral' } | { tipo: 'categoria'; categoriaId: string };
+
+export function aplicarCorteNoFoco(estimativa: EstimativaDeGastos, foco: FocoDoCorte, fator: number): EstimativaDeGastos {
+  return foco.tipo === 'categoria'
+    ? ajustarGastoDeCategoria(estimativa, foco.categoriaId, fator)
+    : ajustarGastoDoDiaADia(estimativa, fator);
+}
+
+export type Cenarios = {
+  // Sem nenhum ajuste do "e se" — o que o app assume de verdade.
+  base: ResultadoViabilidade;
+  // Com o corte escolhido no "e se" (igual à `base` quando reducaoPct = 0).
+  esperado: ResultadoViabilidade;
+  // O esperado com 20% a mais de gasto do dia a dia INTEIRO (a linha tracejada) —
+  // nunca só a categoria em foco: o texto do aviso de folga fala do dia a dia.
+  pesado: ResultadoViabilidade;
+  // Corte necessário no dia a dia INTEIRO e por quê, quando não resolve —
+  // independem do foco (é o que alimenta a sugestão "gaste menos X/mês" e o
+  // botão "Rever gastos", que não podem mudar ao clicar num chip).
+  corteNecessario: number | null;
+  motivoSemSolucao: MotivoSemSolucao;
+  // O mesmo, mas pro foco atual (o que o cartão "e se" mostra).
+  corteNoFoco: number | null;
+  motivoNoFoco: MotivoSemSolucao;
+};
+
+export function calcularCenarios(
+  estimativa: EstimativaDeGastos,
+  avaliar: Avaliador,
+  reducaoPct: number,
+  foco: FocoDoCorte,
+): Cenarios {
+  const base = avaliar(estimativa);
+  const corteNecessario = calcularCorteNecessarioEmPercentual(avaliar, estimativa);
+  const motivoSemSolucao = corteNecessario === null ? explicarSemSolucao(avaliar, estimativa) : 'fixos';
+
+  const emCategoria = foco.tipo === 'categoria';
+  const corteNoFoco = emCategoria
+    ? calcularCorteNecessarioEmCategoria(avaliar, estimativa, foco.categoriaId)
+    : corteNecessario;
+  const motivoNoFoco: MotivoSemSolucao =
+    corteNoFoco !== null
+      ? 'fixos'
+      : emCategoria
+        ? explicarSemSolucaoNaCategoria(avaliar, estimativa, foco.categoriaId)
+        : motivoSemSolucao;
+
+  const estimativaEsperada =
+    reducaoPct === 0 ? estimativa : aplicarCorteNoFoco(estimativa, foco, 1 - reducaoPct / 100);
+  return {
+    base,
+    esperado: reducaoPct === 0 ? base : avaliar(estimativaEsperada),
+    pesado: avaliar(ajustarGastoDoDiaADia(estimativaEsperada, FATOR_IMPREVISTOS)),
+    corteNecessario,
+    motivoSemSolucao,
+    corteNoFoco,
+    motivoNoFoco,
+  };
 }
 
 // A faixa só faz sentido quando o cenário pesado é diferente do esperado
@@ -96,6 +253,8 @@ export function descreverEseSe({
   motivoSemSolucao = 'fixos',
   gastoDoDiaADia,
   esperado,
+  nomeCategoria,
+  corteGeral,
 }: {
   reducaoPct: number;
   // Corte mínimo pra caber, no estado sem ajuste (ver calcularCorteNecessarioEmPercentual).
@@ -105,22 +264,34 @@ export function descreverEseSe({
   gastoDoDiaADia: number;
   // Resultado JÁ com o corte escolhido aplicado.
   esperado: ResultadoViabilidade;
+  // Quando o corte é só de UMA categoria (ver EseSeCard), cita o nome dela em
+  // vez de falar do "dia a dia" inteiro — mesma frase, foco diferente.
+  nomeCategoria?: string;
+  // Só com `nomeCategoria`: o corte necessário no dia a dia INTEIRO. Se ele
+  // existe (não é null), o problema não são as despesas fixas — é que essa
+  // categoria, sozinha, é pequena demais pra resolver.
+  corteGeral?: number | null;
 }): string {
+  const noFoco = nomeCategoria ? `em ${nomeCategoria}` : 'no dia a dia';
+  const doFoco = nomeCategoria ? `em ${nomeCategoria}` : 'do dia a dia';
+
   if (reducaoPct === 0) {
     if (corteNecessario === 0) return 'Do jeito que está, a meta já cabe.';
     if (corteNecessario === null) {
       return motivoSemSolucao === 'mes-atual'
         ? 'O mês atual já fechou no negativo com o que foi lançado, e cortar gastos dos próximos meses não muda isso. Que tal começar a meta no mês que vem?'
-        : 'Só reduzir o gasto do dia a dia não basta: as despesas fixas já pesam demais nessa meta.';
+        : nomeCategoria && corteGeral !== null && corteGeral !== undefined
+          ? `Só cortar ${nomeCategoria} não basta, mesmo zerando: essa categoria é só uma parte do seu dia a dia. Escolha "Tudo" ou combine com outras categorias.`
+          : `Só reduzir o gasto ${doFoco} não basta: as despesas fixas já pesam demais nessa meta.`;
     }
-    return `Reduzindo cerca de ${corteNecessario}% do gasto do dia a dia, a meta passa a caber.`;
+    return `Reduzindo cerca de ${corteNecessario}% do gasto ${doFoco}, a meta passa a caber.`;
   }
 
   const economia = (gastoDoDiaADia * reducaoPct) / 100;
   if (esperado.viavel) {
-    return `Com ${reducaoPct}% a menos no dia a dia (${formatarReal(economia)} por mês), a meta cabe.`;
+    return `Com ${reducaoPct}% a menos ${noFoco} (${formatarReal(economia)} por mês), a meta cabe.`;
   }
-  return `Com ${reducaoPct}% a menos no dia a dia (${formatarReal(economia)} por mês), o saldo ainda fica negativo em ${formatarMesBr(esperado.piorMes)}.`;
+  return `Com ${reducaoPct}% a menos ${noFoco} (${formatarReal(economia)} por mês), o saldo ainda fica negativo em ${formatarMesBr(esperado.piorMes)}.`;
 }
 
 // O que dizer, e o que oferecer, quando uma meta de GUARDAR dinheiro (economia,
@@ -167,4 +338,10 @@ export function sugestaoParaMetaDeGuardar({
     };
   }
   return { texto: '', reducaoMensal: 0 };
+}
+
+// "no dia a dia" / "em <categoria>" — como os vereditos das telas citam o que
+// o "e se" está cortando.
+export function descreverOndeCorta(nomeCategoria?: string): string {
+  return nomeCategoria ? `em ${nomeCategoria}` : 'no dia a dia';
 }

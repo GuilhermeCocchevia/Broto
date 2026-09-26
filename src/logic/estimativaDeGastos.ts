@@ -29,6 +29,19 @@ export type DespesaRecorrenteNaPratica = {
   // Como o usuário escreveu, na ocorrência mais recente (pra mostrar na tela).
   descricao: string;
   valorMensal: number;
+  // Categoria da ocorrência mais recente — usada pra agrupar o "e se" por
+  // categoria (ver GastoPorCategoriaEstimado/cenariosDeProjecao.ts).
+  categoriaId: string;
+};
+
+// Fatia do gasto variável atribuída a uma categoria — proporcional à
+// participação dela no total bruto lançado na janela (mês atual + fechados),
+// aplicada sobre o `gastoVariavelMensal` já calculado (piso/média). Não é uma
+// segunda estimativa independente: é só "de quem é" o número que já existe,
+// pra permitir cortar o 'e se' numa categoria só em vez do dia a dia inteiro.
+export type GastoPorCategoriaEstimado = {
+  categoriaId: string;
+  valorMensal: number;
 };
 
 export type EstimativaDeGastos = {
@@ -37,6 +50,9 @@ export type EstimativaDeGastos = {
   // Gasto avulso "de verdade" esperado por mês, JÁ sem as recorrentes na
   // prática (que são somadas à parte, pra não contar duas vezes).
   gastoVariavelMensal: number;
+  // gastoVariavelMensal repartido por categoria (soma exatamente o total,
+  // maior valor primeiro; vazio quando gastoVariavelMensal é 0).
+  gastoVariavelPorCategoria: GastoPorCategoriaEstimado[];
   recorrentesNaPratica: DespesaRecorrenteNaPratica[];
   // Em quantos dos meses da janela (atual + fechados) havia alguma avulsa
   // lançada — base da `confianca`.
@@ -107,16 +123,22 @@ export function estimarGastosFuturos(transacoes: Transacao[], mesAtual: string):
         chave,
         descricao: grupo.recente.descricao,
         valorMensal: media([...grupo.porMes.values()]),
+        categoriaId: grupo.recente.categoriaId,
       });
       chavesRecorrentes.add(chave);
     }
   }
 
   const totalPorMes = new Map<string, number>();
+  const totalPorCategoriaNaJanela = new Map<string, number>();
   for (const avulsa of avulsas) {
     if (chavesRecorrentes.has(normalizarTexto(avulsa.descricao))) continue;
     const mes = avulsa.data.slice(0, 7);
     totalPorMes.set(mes, (totalPorMes.get(mes) ?? 0) + avulsa.valor);
+    totalPorCategoriaNaJanela.set(
+      avulsa.categoriaId,
+      (totalPorCategoriaNaJanela.get(avulsa.categoriaId) ?? 0) + avulsa.valor,
+    );
   }
   const totaisFechadosComDado = mesesFechados
     .map((mes) => totalPorMes.get(mes) ?? 0)
@@ -124,11 +146,26 @@ export function estimarGastosFuturos(transacoes: Transacao[], mesAtual: string):
   const mediaDosFechados = totaisFechadosComDado.length > 0 ? media(totaisFechadosComDado) : 0;
   const gastoVariavelMensal = Math.max(totalPorMes.get(mesAtual) ?? 0, mediaDosFechados);
 
+  // Reparte gastoVariavelMensal pela participação (bruta, olhando a janela
+  // toda) de cada categoria — não é uma segunda conta independente, é só
+  // "de quem é" o número que já existe, então soma exatamente o total.
+  const totalBrutoDaJanela = [...totalPorCategoriaNaJanela.values()].reduce((soma, valor) => soma + valor, 0);
+  const gastoVariavelPorCategoria: GastoPorCategoriaEstimado[] =
+    totalBrutoDaJanela > 0
+      ? [...totalPorCategoriaNaJanela.entries()]
+          .map(([categoriaId, totalBruto]) => ({
+            categoriaId,
+            valorMensal: (totalBruto / totalBrutoDaJanela) * gastoVariavelMensal,
+          }))
+          .sort((a, b) => b.valorMensal - a.valorMensal)
+      : [];
+
   const mesesComDado = [...janela].filter((mes) => avulsas.some((a) => a.data.slice(0, 7) === mes)).length;
 
   return {
     mesAtual,
     gastoVariavelMensal,
+    gastoVariavelPorCategoria,
     recorrentesNaPratica,
     mesesComDado,
     confianca: confiancaPorMeses(mesesComDado),

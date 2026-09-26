@@ -124,6 +124,34 @@ test('tres-meses-no-azul: um mês sem NENHUM lançamento no meio da janela não 
   expect(avaliarConquistasElegiveis(transacoes, [], MES_ATUAL)).not.toContain('tres-meses-no-azul');
 });
 
+test('projecao-confiavel: precisa de despesa avulsa em pelo menos 3 dos últimos 4 meses (confiança "boa" do estimador)', () => {
+  const doisMeses = [
+    criarTransacao({ id: 'a', data: '2026-08-10' }),
+    criarTransacao({ id: 'b', data: '2026-09-10' }),
+  ];
+  expect(avaliarConquistasElegiveis(doisMeses, [], MES_ATUAL)).not.toContain('projecao-confiavel');
+
+  const tresMeses = [
+    criarTransacao({ id: 'a', data: '2026-07-10' }),
+    criarTransacao({ id: 'b', data: '2026-08-10' }),
+    criarTransacao({ id: 'c', data: '2026-09-10' }),
+  ];
+  expect(avaliarConquistasElegiveis(tresMeses, [], MES_ATUAL)).toContain('projecao-confiavel');
+});
+
+test('projecao-confiavel: diferente de habito-formado — 3 meses antigos (fora da janela do estimador) não bastam', () => {
+  // habito-formado olha a vida inteira; a confiança do estimador só olha o
+  // mês atual + os 3 fechados anteriores (ver estimarGastosFuturos).
+  const tresMesesAntigos = [
+    criarTransacao({ id: 'a', data: '2026-01-10' }),
+    criarTransacao({ id: 'b', data: '2026-02-10' }),
+    criarTransacao({ id: 'c', data: '2026-03-10' }),
+  ];
+  const elegiveis = avaliarConquistasElegiveis(tresMesesAntigos, [], MES_ATUAL);
+  expect(elegiveis).toContain('habito-formado');
+  expect(elegiveis).not.toContain('projecao-confiavel');
+});
+
 test('cenário completo com dados reais do usuário: todas as conquistas "de dados" batem', () => {
   const transacoes: Transacao[] = [
     // Receita fixa desde junho: os 3 meses fechados checados por
@@ -135,8 +163,17 @@ test('cenário completo com dados reais do usuário: todas as conquistas "de dad
     criarTransacao({ id: 'v3', tipo: 'despesa', frequencia: 'unica', valor: 2790, data: '2026-09-10' }),
   ];
   const elegiveis = avaliarConquistasElegiveis(transacoes, [criarSimulacao({})], MES_ATUAL);
+  // Despesas avulsas em jul/ago/set (3 dos últimos 4 meses) também fecham a
+  // confiança do estimador em 'boa' — ver 'projecao-confiavel'.
   expect(elegiveis.sort()).toEqual(
-    ['primeiro-lancamento', 'primeira-simulacao', 'mes-completo', 'habito-formado', 'tres-meses-no-azul'].sort(),
+    [
+      'primeiro-lancamento',
+      'primeira-simulacao',
+      'mes-completo',
+      'habito-formado',
+      'tres-meses-no-azul',
+      'projecao-confiavel',
+    ].sort(),
   );
 });
 
@@ -144,6 +181,13 @@ test('CONQUISTAS: uma entrada no catálogo pra cada chave possível, sem duplica
   const chaves = CONQUISTAS.map((c) => c.chave);
   expect(new Set(chaves).size).toBe(chaves.length);
   expect(chaves).toEqual(
-    expect.arrayContaining(['primeiro-lancamento', 'primeira-simulacao', 'mes-completo', 'habito-formado', 'tres-meses-no-azul']),
+    expect.arrayContaining([
+      'primeiro-lancamento',
+      'primeira-simulacao',
+      'mes-completo',
+      'habito-formado',
+      'tres-meses-no-azul',
+      'projecao-confiavel',
+    ]),
   );
 });

@@ -14,13 +14,15 @@
 import type { Simulacao, Transacao } from '../types/models';
 import { adicionarMeses, transacaoSeAplicaNoMes } from './projecao';
 import { calcularTaxaDePoupanca } from './saudeFinanceira';
+import { estimarGastosFuturos } from './estimativaDeGastos';
 
 export type ChaveConquista =
   | 'primeiro-lancamento'
   | 'primeira-simulacao'
   | 'mes-completo'
   | 'habito-formado'
-  | 'tres-meses-no-azul';
+  | 'tres-meses-no-azul'
+  | 'projecao-confiavel';
 
 export type Conquista = {
   chave: ChaveConquista;
@@ -76,6 +78,15 @@ export const CONQUISTAS: Conquista[] = [
     comoConseguir: 'Feche 3 meses seguidos com taxa de poupança positiva (guardando mais do que gasta).',
     icone: 'leaf.fill',
     iconeFallback: 'leaf',
+  },
+  {
+    chave: 'projecao-confiavel',
+    titulo: 'Projeção confiável',
+    descricao: 'Sua estimativa de gastos futuros já é baseada em bom histórico.',
+    comoConseguir:
+      'Lance despesas avulsas em pelo menos 3 dos últimos 4 meses (contando o atual) — é o que deixa a projeção do Simulador mais confiável, em vez de um palpite com pouco dado.',
+    icone: 'checkmark.seal.fill',
+    iconeFallback: 'checkmark-circle',
   },
 ];
 
@@ -136,5 +147,11 @@ export function avaliarConquistasElegiveis(
   if (existeMesCompleto(transacoes, mesAtual)) elegiveis.push('mes-completo');
   if (mesesComDespesaAvulsa(transacoes).size >= 3) elegiveis.push('habito-formado');
   if (tresMesesConsecutivosNoAzul(transacoes, mesAtual)) elegiveis.push('tres-meses-no-azul');
+  // Mesmo critério de confiança que o motor de projeção usa pra si mesmo
+  // (ver estimarGastosFuturos) — celebra o momento em que a ESTIMATIVA do
+  // app (não só o hábito de lançar) passa a se apoiar em histórico de
+  // verdade, distinto de 'habito-formado' (que conta qualquer 3 meses da
+  // vida do usuário, não necessariamente recentes/seguidos).
+  if (estimarGastosFuturos(transacoes, mesAtual).confianca === 'boa') elegiveis.push('projecao-confiavel');
   return elegiveis;
 }

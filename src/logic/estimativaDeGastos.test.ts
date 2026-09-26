@@ -173,6 +173,60 @@ test('confiança sobe com o número de meses com lançamento: baixa, média, boa
   ).toBe('boa');
 });
 
+test('gastoVariavelPorCategoria: reparte o total proporcionalmente, e soma exatamente o gastoVariavelMensal', () => {
+  const r = estimarGastosFuturos(
+    [
+      criarTransacao({ id: 'a', valor: 300, data: '2026-09-05', categoriaId: 'mercado', descricao: 'Mercado' }),
+      criarTransacao({ id: 'b', valor: 100, data: '2026-09-10', categoriaId: 'farmacia', descricao: 'Farmácia' }),
+    ],
+    MES_ATUAL,
+  );
+  expect(r.gastoVariavelMensal).toBe(400);
+  expect(r.gastoVariavelPorCategoria).toEqual([
+    { categoriaId: 'mercado', valorMensal: 300 },
+    { categoriaId: 'farmacia', valorMensal: 100 },
+  ]);
+});
+
+test('gastoVariavelPorCategoria: mesma categoria em meses diferentes soma, e reparte pela média (não pelo bruto)', () => {
+  // Mercado: ago 3000, set 1000 (parcial) → piso do mês atual (1000) fica
+  // abaixo da média dos fechados (3000) → vale 3000. Farmácia só em ago: 500.
+  // Bruto na janela: mercado 4000, farmácia 500 (total 4500). O total final
+  // (gastoVariavelMensal) é max(1000+0, media([3000+500])) = 3500 — reparte
+  // 4000/4500 pra mercado e 500/4500 pra farmácia.
+  const r = estimarGastosFuturos(
+    [
+      criarTransacao({ id: 'a', valor: 3000, data: '2026-08-05', categoriaId: 'mercado', descricao: 'Mercado ago' }),
+      criarTransacao({ id: 'b', valor: 500, data: '2026-08-06', categoriaId: 'farmacia', descricao: 'Farmácia ago' }),
+      criarTransacao({ id: 'c', valor: 1000, data: '2026-09-05', categoriaId: 'mercado', descricao: 'Mercado set' }),
+    ],
+    MES_ATUAL,
+  );
+  expect(r.gastoVariavelMensal).toBe(3500);
+  const total = r.gastoVariavelPorCategoria.reduce((soma, item) => soma + item.valorMensal, 0);
+  expect(total).toBeCloseTo(3500);
+  expect(r.gastoVariavelPorCategoria[0].categoriaId).toBe('mercado');
+  expect(r.gastoVariavelPorCategoria[0].valorMensal).toBeCloseTo((4000 / 4500) * 3500);
+});
+
+test('gastoVariavelPorCategoria: recorrente na prática não entra (já saiu do variável) e leva a categoria consigo', () => {
+  const r = estimarGastosFuturos(
+    [
+      criarTransacao({ id: 'a', valor: 140, data: '2026-08-10', categoriaId: 'cartao', descricao: 'Cartão Nubank' }),
+      criarTransacao({ id: 'b', valor: 160, data: '2026-09-10', categoriaId: 'cartao', descricao: 'Cartão Nubank' }),
+      criarTransacao({ id: 'c', valor: 500, data: '2026-09-03', categoriaId: 'mercado', descricao: 'Mercado' }),
+    ],
+    MES_ATUAL,
+  );
+  expect(r.gastoVariavelPorCategoria).toEqual([{ categoriaId: 'mercado', valorMensal: 500 }]);
+  expect(r.recorrentesNaPratica[0]).toMatchObject({ categoriaId: 'cartao' });
+});
+
+test('sem nenhum gasto variável: gastoVariavelPorCategoria vazio (não NaN)', () => {
+  const r = estimarGastosFuturos([], MES_ATUAL);
+  expect(r.gastoVariavelPorCategoria).toEqual([]);
+});
+
 test('caso real: 6 avulsas de setembro (4 cartões) e nada antes → variável = total de setembro', () => {
   const r = estimarGastosFuturos(
     [

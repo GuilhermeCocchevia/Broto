@@ -13,6 +13,7 @@ import { EseSeCard } from '../components/EseSeCard';
 import { usePremissasDeProjecao } from '../hooks/usePremissasDeProjecao';
 import { useCenarios } from '../hooks/useCenarios';
 import {
+  descreverOndeCorta,
   montarAvisoDeFolga,
   sugestaoParaMetaDeGuardar,
   temFaixaDeCenarios,
@@ -78,7 +79,7 @@ export default function DetalheSimulacaoScreen() {
     return (estimativaAvaliada) =>
       avaliarViabilidadeSimulacao(simulacao, transacoes, saldoAtual, rendaFixaMensal, estimativaAvaliada);
   }, [simulacao, transacoes, saldoAtual, rendaFixaMensal]);
-  const { cenarios, reducaoPct, setReducaoPct } = useCenarios(estimativa, avaliar);
+  const { cenarios, reducaoPct, setReducaoPct, foco, setFoco } = useCenarios(estimativa, avaliar);
   const resultado = cenarios?.esperado ?? null;
 
   if (!simulacao || !cenarios || !resultado) {
@@ -136,7 +137,8 @@ export default function DetalheSimulacaoScreen() {
   const reducaoMensal = sugestao.reducaoMensal;
 
   // Com um corte do "e se" escolhido, o veredito descreve ESSE cenário.
-  const comEseSe = reducaoPct > 0 ? `Com ${reducaoPct}% a menos no dia a dia, ` : '';
+  const ondeCorta = descreverOndeCorta(foco.tipo === 'categoria' ? categoriaPorId.get(foco.categoriaId)?.nome : undefined);
+  const comEseSe = reducaoPct > 0 ? `Com ${reducaoPct}% a menos ${ondeCorta}, ` : '';
   const minuscula = (texto: string) => texto.charAt(0).toLowerCase() + texto.slice(1);
   const avisoDeFolga = montarAvisoDeFolga(cenarios.esperado, cenarios.pesado);
 
@@ -150,7 +152,7 @@ export default function DetalheSimulacaoScreen() {
     (avisoDeFolga ? ` ${avisoDeFolga}` : '');
 
   const mensagemNaoViavel = ehMetaDeGuardar
-    ? `${reducaoPct > 0 ? `Mesmo com ${reducaoPct}% a menos no dia a dia, seu` : 'Guardando esse valor, seu'} saldo fica negativo em ${formatarMesBr(resultado.piorMes)} (ficaria em ${formatarReal(resultado.piorSaldo)}).${reducaoPct === 0 && sugestao.texto ? ` ${sugestao.texto}` : ''}`
+    ? `${reducaoPct > 0 ? `Mesmo com ${reducaoPct}% a menos ${ondeCorta}, seu` : 'Guardando esse valor, seu'} saldo fica negativo em ${formatarMesBr(resultado.piorMes)} (ficaria em ${formatarReal(resultado.piorSaldo)}).${reducaoPct === 0 && sugestao.texto ? ` ${sugestao.texto}` : ''}`
     : `Essa compra deixaria seu saldo negativo em ${formatarMesBr(resultado.piorMes)} (ficaria em ${formatarReal(resultado.piorSaldo)}). Talvez valha ajustar o valor, o número de parcelas, ou esperar um pouco.`;
 
   // Só existe (e só faz sentido mostrar) quando há taxa de rendimento OU
@@ -198,6 +200,10 @@ export default function DetalheSimulacaoScreen() {
                 cenarios={cenarios}
                 reducaoPct={reducaoPct}
                 onChange={setReducaoPct}
+                estimativa={estimativa}
+                foco={foco}
+                onChangeFoco={setFoco}
+                categoriaPorId={categoriaPorId}
                 gastoDoDiaADia={premissas.gastoDoDiaADia}
                 mesAtual={estimativa.mesAtual}
               />
