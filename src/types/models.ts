@@ -8,9 +8,10 @@
 // não gera código extra no JS final e funciona igual com autocomplete.
 export type TipoTransacao = 'receita' | 'despesa';
 
-// Uma transação pode ser única (aconteceu uma vez) ou mensal (se repete todo mês,
-// tipo assinatura de streaming ou salário).
-export type Frequencia = 'unica' | 'mensal';
+// Uma transação pode ser única (aconteceu uma vez), mensal (se repete todo mês,
+// tipo assinatura de streaming ou salário) ou anual (se repete todo ano, no
+// mesmo mês e dia da `data` — IPVA, IPTU, seguro, matrícula, 13º salário).
+export type Frequencia = 'unica' | 'mensal' | 'anual';
 
 export type Categoria = {
   id: string;

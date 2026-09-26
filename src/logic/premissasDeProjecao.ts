@@ -8,7 +8,9 @@ import {
   adicionarMeses,
   calcularRendaEsperadaDoMes,
   calcularRendaFixaMedia,
+  listarOcorrenciasAnuais,
   obterSaldoAtual,
+  type OcorrenciaAnual,
 } from './projecao';
 import { estimarGastosFuturos, type EstimativaDeGastos } from './estimativaDeGastos';
 import { calcularDespesasFixasDoMes } from './orcamentoMensal';
@@ -26,7 +28,15 @@ export type PremissasDeProjecao = {
   // Gasto do dia a dia: variável + o que se repete na prática (cartões).
   gastoDoDiaADia: number;
   sobraTipica: number;
+  // Transações ANUAIS (IPVA, IPTU, 13º...) previstas nos próximos 12 meses.
+  // Ficam de fora do "mês típico" acima (que é um retrato de um mês comum),
+  // mas entram na projeção mês a mês — o cartão "Como calculei" as lista pra
+  // explicar os saltos no gráfico.
+  ocorrenciasAnuais: OcorrenciaAnual[];
 };
+
+// Quantos meses à frente o cartão olha atrás de contas anuais.
+const MESES_PRA_LISTAR_ANUAIS = 12;
 
 export function montarPremissas(
   transacoes: Transacao[],
@@ -53,6 +63,7 @@ export function montarPremissas(
     despesasFixas,
     gastoDoDiaADia,
     sobraTipica: rendaEsperada - despesasFixas - gastoDoDiaADia,
+    ocorrenciasAnuais: listarOcorrenciasAnuais(transacoes, mesTipico, MESES_PRA_LISTAR_ANUAIS),
   };
 }
 

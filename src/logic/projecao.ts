@@ -47,17 +47,52 @@ function diferencaEmMeses(mesA: string, mesB: string): number {
 }
 
 // Uma transação "se aplica" a um mês se: for única e tiver acontecido nesse
-// mês exato, ou for mensal e esse mês estiver dentro do intervalo dela
-// (começou antes ou nesse mês, e ainda não passou de dataFim). Extraída
+// mês exato; for mensal e esse mês estiver dentro do intervalo dela (começou
+// antes ou nesse mês, e ainda não passou de dataFim); ou for anual e esse for
+// o MESMO mês do ano da data dela, num ano em que ela já valia. Extraída
 // porque tanto a projeção quanto as métricas de saúde financeira (gasto por
 // categoria, taxa de poupança) precisam responder exatamente essa mesma
 // pergunta — antes essa lógica só existia dentro do loop de
 // calcularSaldoProjetado.
+//
+// Cada frequência é tratada de forma EXPLÍCITA (switch), nunca "o que não é
+// única é mensal": foi assim que uma frequência nova (anual) deixaria de ser
+// notada e passaria a ser cobrada todo mês em silêncio.
 export function transacaoSeAplicaNoMes(transacao: Transacao, mes: string): boolean {
   const mesDaTransacao = formatarMes(transacao.data);
-  return transacao.frequencia === 'unica'
-    ? mesDaTransacao === mes
-    : mes >= mesDaTransacao && (transacao.dataFim === null || mes <= formatarMes(transacao.dataFim));
+  const dentroDoIntervalo =
+    mes >= mesDaTransacao && (transacao.dataFim === null || mes <= formatarMes(transacao.dataFim));
+  switch (transacao.frequencia) {
+    case 'unica':
+      return mesDaTransacao === mes;
+    case 'mensal':
+      return dentroDoIntervalo;
+    case 'anual':
+      // Só o mês do ano (posições 5-6 de 'AAAA-MM') tem que bater.
+      return dentroDoIntervalo && mes.slice(5, 7) === mesDaTransacao.slice(5, 7);
+  }
+}
+
+// Uma ocorrência de uma transação anual (IPVA, 13º...) num mês específico.
+export type OcorrenciaAnual = { transacao: Transacao; mes: string };
+
+// As transações ANUAIS que caem nos `quantidadeMeses` meses a partir de
+// `mesInicial` (inclusive), em ordem cronológica — pra mostrar ao usuário
+// "por que o saldo dá um salto em janeiro" (ver PremissasDaProjecao).
+export function listarOcorrenciasAnuais(
+  transacoes: Transacao[],
+  mesInicial: string,
+  quantidadeMeses: number,
+): OcorrenciaAnual[] {
+  const anuais = transacoes.filter((t) => t.frequencia === 'anual');
+  const ocorrencias: OcorrenciaAnual[] = [];
+  for (let i = 0; i < quantidadeMeses; i++) {
+    const mes = adicionarMeses(mesInicial, i);
+    for (const transacao of anuais) {
+      if (transacaoSeAplicaNoMes(transacao, mes)) ocorrencias.push({ transacao, mes });
+    }
+  }
+  return ocorrencias;
 }
 
 // Quantos salários olhar pra trás pra calcular a renda fixa projetada.
@@ -202,16 +237,18 @@ export function calcularQuantidadeDeMesesPorDataFim(dataInicio: string, dataFim:
   return diferencaEmMeses(formatarMes(dataFim), formatarMes(dataInicio)) + 1;
 }
 
-// Quantas vezes uma transação recorrente ('mensal') já ocorreu de VERDADE,
-// contando só entre `dataReferencia` (exclusive) e `hoje` (inclusive). Difere
+// Quantas vezes uma transação recorrente ('mensal' ou 'anual') já ocorreu de
+// VERDADE, contando só entre `dataReferencia` (exclusive) e `hoje` (inclusive).
+// `passoEmMeses` é 1 pra mensal e 12 pra anual. Difere
 // de calcularSaldoProjetado: aqui a data importa (uma assinatura que cobra no
 // dia 20 ainda não "aconteceu" se hoje é dia 14), porque isso alimenta o saldo
 // real — já a projeção trabalha em blocos de mês inteiro porque o futuro é só
 // estimativa mesmo, não teria sentido fingir precisão de dia lá.
-function contarOcorrenciasMensais(
+function contarOcorrenciasRecorrentes(
   transacao: Transacao,
   dataReferencia: string,
   hoje: string,
+  passoEmMeses: number,
 ): number {
   const diaDoMes = Number(transacao.data.slice(8, 10));
   const mesDoFim = transacao.dataFim === null ? null : formatarMes(transacao.dataFim);
@@ -224,7 +261,7 @@ function contarOcorrenciasMensais(
     if (dataDaOcorrencia > dataReferencia && dataDaOcorrencia <= hoje) {
       contagem++;
     }
-    mes = adicionarMeses(mes, 1);
+    mes = adicionarMeses(mes, passoEmMeses);
   }
 
   return contagem;
@@ -270,7 +307,8 @@ export function obterSaldoAtual(
       return jaAconteceu ? total + sinal * transacao.valor : total;
     }
 
-    const ocorrencias = contarOcorrenciasMensais(transacao, dataReferencia, hoje);
+    const passoEmMeses = transacao.frequencia === 'anual' ? 12 : 1;
+    const ocorrencias = contarOcorrenciasRecorrentes(transacao, dataReferencia, hoje, passoEmMeses);
     return total + sinal * transacao.valor * ocorrencias;
   }, 0);
 

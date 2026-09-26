@@ -22,6 +22,7 @@ import { mensagemDeErro } from '../utils/mensagemDeErro';
 import { escolherCorAutomatica, encontrarCategoriaPorNome } from '../utils/resolverOuCriarCategoria';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import type { TipoTransacao, Frequencia } from '../types/models';
+import { categoriaCostumaSerAnual } from '../utils/categoriaCostumaSerAnual';
 import { hojeLocal } from '../utils/dataLocal';
 
 // Formulário genérico de lançamento — serve tanto pra registrar um salário já
@@ -233,7 +234,19 @@ export default function NovaTransacaoScreen() {
             selecionado={frequencia === 'mensal'}
             onPress={() => setFrequencia('mensal')}
           />
+          <OpcaoBotao
+            label="Anual (1x por ano)"
+            selecionado={frequencia === 'anual'}
+            onPress={() => setFrequencia('anual')}
+          />
         </View>
+
+        {frequencia === 'anual' && (
+          <Text style={styles.dica}>
+            Repete todo ano, no mesmo mês e dia da data escolhida — como IPVA, IPTU, seguro ou 13º salário. Pra
+            parar de repetir, edite ou exclua.
+          </Text>
+        )}
 
         {frequencia === 'mensal' && (
           <>
@@ -254,6 +267,15 @@ export default function NovaTransacaoScreen() {
           valor={categoriaTexto}
           onChangeValor={setCategoriaTexto}
         />
+
+        {frequencia === 'unica' && categoriaCostumaSerAnual(categoriaTexto) && (
+          <Pressable onPress={() => setFrequencia('anual')}>
+            <Text style={styles.dica}>
+              Essa categoria costuma se repetir todo ano.{' '}
+              <Text style={styles.dicaAcao}>Marcar como anual</Text>
+            </Text>
+          </Pressable>
+        )}
 
         {erro && <Text style={styles.erro}>{erro}</Text>}
 
@@ -286,6 +308,16 @@ const styles = StyleSheet.create({
   conteudo: {
     padding: 24,
     gap: 4,
+  },
+  dica: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.textMuted,
+    marginTop: 8,
+  },
+  dicaAcao: {
+    color: colors.primaryDark,
+    fontWeight: '700',
   },
   rotulo: {
     fontSize: 13,

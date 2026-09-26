@@ -199,3 +199,12 @@ test('calcularDespesasFixasDoMes: só as mensais ativas no mês (sem avulsas, se
 
   expect(calcularDespesasFixasDoMes(transacoes, '2026-03')).toBe(1919);
 });
+
+test('despesa anual entra no total do mês em que cai, mas não nas despesas FIXAS mensais', () => {
+  const anual = criarTransacao({ id: 'a', frequencia: 'anual', valor: 900, data: '2026-03-20' });
+  const fixa = criarTransacao({ id: 'f', frequencia: 'mensal', valor: 100, data: '2026-01-10' });
+
+  expect(calcularDespesasTotaisDoMes([anual, fixa], '2027-03')).toBe(1000);
+  expect(calcularDespesasTotaisDoMes([anual, fixa], '2027-04')).toBe(100);
+  expect(calcularDespesasFixasDoMes([anual, fixa], '2027-03')).toBe(100);
+});

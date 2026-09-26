@@ -114,3 +114,15 @@ test('calcularMesesDeGastoCobertos divide o saldo pela despesa média mensal', (
 test('calcularMesesDeGastoCobertos devolve 0 sem despesa nenhuma pra servir de referência', () => {
   expect(calcularMesesDeGastoCobertos(3000, 0)).toBe(0);
 });
+
+test('despesa anual conta no mês em que cai (gasto por categoria e taxa de poupança) e em nenhum outro', () => {
+  const salario = criarTransacao({ id: 's', tipo: 'receita', frequencia: 'mensal', valor: 4000, data: '2026-01-05' });
+  const ipva = criarTransacao({ id: 'i', frequencia: 'anual', valor: 1000, data: '2026-01-15', categoriaId: 'imposto' });
+
+  expect(calcularGastoPorCategoria([salario, ipva], '2027-01')).toEqual([{ categoriaId: 'imposto', total: 1000 }]);
+  expect(calcularGastoPorCategoria([salario, ipva], '2027-02')).toEqual([]);
+  expect(calcularTaxaDePoupanca([salario, ipva], '2027-01')).toBeCloseTo(0.75);
+  expect(calcularTaxaDePoupanca([salario, ipva], '2027-02')).toBeCloseTo(1);
+  // Não é despesa FIXA mensal: não entra no comprometimento de renda fixa.
+  expect(calcularComprometimentoDeRendaFixa([salario, ipva], '2027-01')).toBe(0);
+});

@@ -77,6 +77,10 @@ export default function ExtratoScreen() {
     () => ordenarComReceitasPrimeiro(transacoes.filter((t) => t.frequencia === 'mensal')),
     [transacoes],
   );
+  const anuais = useMemo(
+    () => ordenarComReceitasPrimeiro(transacoes.filter((t) => t.frequencia === 'anual')),
+    [transacoes],
+  );
   const unicas = useMemo(
     () => ordenarComReceitasPrimeiro(transacoes.filter((t) => t.frequencia === 'unica')),
     [transacoes],
@@ -132,6 +136,13 @@ export default function ExtratoScreen() {
           <>
             <Text style={styles.secaoTitulo}>Fixas mensais</Text>
             <View style={styles.lista}>{fixas.map(renderizarLinha)}</View>
+          </>
+        )}
+
+        {anuais.length > 0 && (
+          <>
+            <Text style={styles.secaoTitulo}>Anuais</Text>
+            <View style={styles.lista}>{anuais.map(renderizarLinha)}</View>
           </>
         )}
 

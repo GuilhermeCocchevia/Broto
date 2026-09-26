@@ -35,7 +35,7 @@ export const transacoes = sqliteTable('transacoes', {
   categoriaId: text('categoria_id')
     .notNull()
     .references(() => categorias.id),
-  frequencia: text('frequencia', { enum: ['unica', 'mensal'] }).notNull(),
+  frequencia: text('frequencia', { enum: ['unica', 'mensal', 'anual'] }).notNull(),
   dataFim: text('data_fim'),
 });
 

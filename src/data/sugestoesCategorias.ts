@@ -209,6 +209,7 @@ export const SUGESTOES_DESPESA: SugestaoCategoria[] = [
   { nome: 'Seguro do carro', apelidos: ['transporte', 'veiculo', 'seguro'] },
   { nome: 'Seguro da moto', apelidos: ['transporte', 'veiculo', 'motocicleta', 'seguro'] },
   { nome: 'IPVA', apelidos: ['imposto', 'transporte', 'veiculo', 'carro', 'moto'] },
+  { nome: 'Licenciamento do veículo', apelidos: ['imposto', 'transporte', 'veiculo', 'carro', 'moto', 'crlv', 'detran'] },
   { nome: 'Estacionamento', apelidos: ['transporte'] },
   { nome: 'Pedágio', apelidos: ['transporte'] },
   { nome: 'Multa de trânsito', apelidos: ['transporte', 'veiculo'] },
@@ -250,6 +251,7 @@ export const SUGESTOES_DESPESA: SugestaoCategoria[] = [
 
   // Educação
   { nome: 'Mensalidade escolar', apelidos: ['escola', 'educacao'] },
+  { nome: 'Matrícula escolar', apelidos: ['escola', 'educacao', 'material escolar'] },
   { nome: 'Faculdade', apelidos: ['universidade', 'educacao'] },
   { nome: 'Cursos', apelidos: ['educacao', 'capacitacao'] },
   { nome: 'Aula de idiomas', apelidos: ['ingles', 'espanhol', 'idiomas', 'educacao'] },
@@ -285,6 +287,7 @@ export const SUGESTOES_DESPESA: SugestaoCategoria[] = [
 
   // Financeiro
   { nome: 'Cartão de crédito', apelidos: ['fatura'] },
+  { nome: 'Anuidade do cartão', apelidos: ['cartao', 'tarifa', 'banco'] },
   { nome: 'Empréstimo', apelidos: [] },
   { nome: 'Financiamento', apelidos: [] },
   { nome: 'Juros', apelidos: [] },

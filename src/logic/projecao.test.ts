@@ -15,6 +15,8 @@ import {
   calcularDespesaVariavelMedia,
   calcularReducaoMensalNecessaria,
   calcularRendaEsperadaDoMes,
+  listarOcorrenciasAnuais,
+  transacaoSeAplicaNoMes,
 } from './projecao';
 import { estimarGastosFuturos } from './estimativaDeGastos';
 import type { Transacao, Simulacao, SaldoInicial } from '../types/models';
@@ -909,4 +911,91 @@ test('obterSaldoAtual: saldo informado à noite (22h locais) não esconde os lan
   const despesaDeAmanha = criarTransacao({ valor: 100, data: '2026-09-21', tipo: 'despesa' });
 
   expect(obterSaldoAtual(saldos, [despesaDeAmanha], '2026-09-21')).toBe(900);
+});
+
+// --- Frequência ANUAL (fase 4 do motor de projeção) ---
+// Risco central: várias contas tratavam "não é única" como "é mensal". Uma
+// transação anual precisa cair SÓ no mês do ano dela, nunca em todo mês.
+const ipva = criarTransacao({ id: 'ipva', frequencia: 'anual', valor: 1500, data: '2026-01-15', descricao: 'IPVA' });
+
+test('transacaoSeAplicaNoMes: anual só cai no mesmo mês do ano, a partir do ano em que começou', () => {
+  expect(transacaoSeAplicaNoMes(ipva, '2026-01')).toBe(true);
+  expect(transacaoSeAplicaNoMes(ipva, '2027-01')).toBe(true);
+  expect(transacaoSeAplicaNoMes(ipva, '2030-01')).toBe(true);
+  // Outros meses do ano: nunca.
+  for (const mes of ['2026-02', '2026-06', '2026-12', '2027-02']) {
+    expect(transacaoSeAplicaNoMes(ipva, mes)).toBe(false);
+  }
+  // Antes de começar: não vale (mesmo sendo janeiro).
+  expect(transacaoSeAplicaNoMes(ipva, '2025-01')).toBe(false);
+});
+
+test('transacaoSeAplicaNoMes: anual respeita dataFim (não cai em anos depois do fim)', () => {
+  const comFim = { ...ipva, dataFim: '2027-06-01' };
+  expect(transacaoSeAplicaNoMes(comFim, '2027-01')).toBe(true);
+  expect(transacaoSeAplicaNoMes(comFim, '2028-01')).toBe(false);
+});
+
+test('transacaoSeAplicaNoMes continua igual pra única e mensal', () => {
+  const unica = criarTransacao({ data: '2026-03-10' });
+  expect(transacaoSeAplicaNoMes(unica, '2026-03')).toBe(true);
+  expect(transacaoSeAplicaNoMes(unica, '2027-03')).toBe(false);
+  const mensal = criarTransacao({ frequencia: 'mensal', data: '2026-03-10' });
+  expect(transacaoSeAplicaNoMes(mensal, '2026-04')).toBe(true);
+});
+
+test('calcularSaldoProjetado: IPVA anual aparece só em janeiro, atravessando a virada do ano', () => {
+  const meses = calcularSaldoProjetado([ipva], [], '2026-11', 15);
+  // nov/2026 .. jan/2028: janeiro/2027 e janeiro/2028 têm o IPVA; o resto, zero.
+  const comSaida = meses.filter((m) => m.saidas > 0).map((m) => m.mes);
+  expect(comSaida).toEqual(['2027-01', '2028-01']);
+  expect(meses.find((m) => m.mes === '2027-01')!.saidas).toBe(1500);
+  expect(meses[meses.length - 1].saldo).toBe(-3000);
+});
+
+test('13º salário (receita anual em dezembro) soma no mês certo e NÃO cala a renda fixa estimada', () => {
+  const decimoTerceiro = criarTransacao({
+    id: '13', tipo: 'receita', frequencia: 'anual', valor: 3000, data: '2026-12-20', descricao: '13º salário',
+  });
+  const meses = calcularSaldoProjetado([decimoTerceiro], [], '2026-11', 3, 0, 3000);
+  // renda fixa estimada (3000) vale nos 3 meses; em dezembro soma o 13º por cima.
+  expect(meses.map((m) => m.entradas)).toEqual([3000, 6000, 3000]);
+});
+
+test('despesa anual não é tratada como gasto avulso pelo motor (não vira estimativa de gasto variável)', () => {
+  const estimativa = estimarGastosFuturos([ipva], '2026-01');
+  expect(estimativa.gastoVariavelMensal).toBe(0);
+  expect(estimativa.recorrentesNaPratica).toEqual([]);
+  expect(estimativa.mesesComDado).toBe(0);
+});
+
+test('obterSaldoAtual: conta a anual UMA vez por ano já passado, nunca todo mês', () => {
+  const saldos: SaldoInicial[] = [{ id: '1', valor: 10000, criadoEm: '2026-01-01T10:00:00.000Z' }];
+  // IPVA em 15/jan: 2026-01-15 e 2027-01-15 já passaram em 2027-06-01 => 2 ocorrências.
+  expect(obterSaldoAtual(saldos, [ipva], '2027-06-01')).toBe(10000 - 1500 * 2);
+  // Um mês depois da primeira, ainda só 1 (se fosse tratada como mensal seriam várias).
+  expect(obterSaldoAtual(saldos, [ipva], '2026-03-01')).toBe(10000 - 1500);
+});
+
+test('obterSaldoAtual: anual só conta quando o dia do ano já passou', () => {
+  const saldos: SaldoInicial[] = [{ id: '1', valor: 5000, criadoEm: '2026-01-01T10:00:00.000Z' }];
+  const iptu = criarTransacao({ frequencia: 'anual', valor: 900, data: '2026-03-20' });
+  expect(obterSaldoAtual(saldos, [iptu], '2027-03-10')).toBe(5000 - 900); // 20/mar/2027 ainda não chegou
+  expect(obterSaldoAtual(saldos, [iptu], '2027-03-25')).toBe(5000 - 900 * 2);
+});
+
+test('obterSaldoAtual: anual em 29/fev cai em 28/fev nos anos não bissextos', () => {
+  const saldos: SaldoInicial[] = [{ id: '1', valor: 1000, criadoEm: '2027-01-01T10:00:00.000Z' }];
+  const seguro = criarTransacao({ frequencia: 'anual', valor: 100, data: '2024-02-29' });
+  expect(obterSaldoAtual(saldos, [seguro], '2027-03-01')).toBe(1000 - 100);
+});
+
+test('listarOcorrenciasAnuais: só as anuais dos próximos meses, em ordem cronológica', () => {
+  const iptu = criarTransacao({ id: 'iptu', frequencia: 'anual', valor: 900, data: '2026-03-20', descricao: 'IPTU' });
+  const mensal = criarTransacao({ id: 'm', frequencia: 'mensal', valor: 50 });
+  const r = listarOcorrenciasAnuais([iptu, mensal, ipva], '2026-11', 12);
+  expect(r.map((o) => [o.transacao.descricao, o.mes])).toEqual([
+    ['IPVA', '2027-01'],
+    ['IPTU', '2027-03'],
+  ]);
 });

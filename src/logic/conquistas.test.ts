@@ -191,3 +191,12 @@ test('CONQUISTAS: uma entrada no catálogo pra cada chave possível, sem duplica
     ]),
   );
 });
+
+test('lançamentos ANUAIS não contam como "gasto avulso" pra hábito/projeção confiável', () => {
+  const anuais = ['2026-07', '2026-08', '2026-09'].map((mes, i) =>
+    criarTransacao({ id: `a${i}`, frequencia: 'anual', data: `${mes}-10` }),
+  );
+  const elegiveis = avaliarConquistasElegiveis(anuais, [], MES_ATUAL);
+  expect(elegiveis).not.toContain('habito-formado');
+  expect(elegiveis).not.toContain('projecao-confiavel');
+});

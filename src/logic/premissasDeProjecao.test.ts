@@ -62,3 +62,22 @@ test('textoDaConfianca: cada nível tem uma frase calma e honesta', () => {
   expect(textoDaConfianca({ ...base, confianca: 'media', mesesComDado: 2 })).toBe('Baseado em 2 meses de lançamentos.');
   expect(textoDaConfianca({ ...base, confianca: 'boa', mesesComDado: 4 })).toBe('Baseado em 4 meses de lançamentos.');
 });
+
+test('montarPremissas: lista as contas e receitas ANUAIS dos próximos 12 meses e não as mistura no mês típico', () => {
+  const transacoes = [
+    criarTransacao({ id: 'r', tipo: 'receita', frequencia: 'mensal', valor: 5000, data: '2026-01-05', descricao: 'Salário' }),
+    criarTransacao({ id: 'f', frequencia: 'mensal', valor: 2000, data: '2026-01-10', descricao: 'Fixos' }),
+    criarTransacao({ id: 'ipva', frequencia: 'anual', valor: 1500, data: '2026-10-15', descricao: 'IPVA' }),
+    criarTransacao({ id: '13', tipo: 'receita', frequencia: 'anual', valor: 5000, data: '2026-12-20', descricao: '13º' }),
+  ];
+  // Hoje: setembro/2026; o "mês típico" é outubro — que TEM o IPVA.
+  const p = montarPremissas(transacoes, SEM_SALDO, '2026-09');
+
+  expect(p.ocorrenciasAnuais.map((o) => [o.transacao.descricao, o.mes])).toEqual([
+    ['IPVA', '2026-10'],
+    ['13º', '2026-12'],
+  ]);
+  // O retrato do mês típico só conta as despesas FIXAS (mensais): o IPVA de
+  // outubro aparece na lista e na projeção, mas não distorce a "sobra típica".
+  expect(p.despesasFixas).toBe(2000);
+});

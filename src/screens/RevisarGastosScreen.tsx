@@ -89,7 +89,7 @@ export default function RevisarGastosScreen() {
               brilho
               titulo={item.descricao}
               subtitulo={`${categoriaPorId.get(item.categoriaId)?.nome ?? 'Sem categoria'} · ${
-                item.frequencia === 'mensal' ? 'fixa mensal' : formatarDataBr(item.data)
+                item.frequencia === 'mensal' ? 'fixa mensal' : item.frequencia === 'anual' ? 'anual' : formatarDataBr(item.data)
               }`}
               valorTexto={`-${formatarReal(item.valor)}`}
               valorCor={colors.danger}
