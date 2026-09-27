@@ -8,6 +8,7 @@ import { db } from './src/db/client';
 import migrations from './drizzle/migrations';
 import RootNavigator from './src/navigation/RootNavigator';
 import { ConquistasGlobais } from './src/components/ConquistasGlobais';
+import { BloqueioDoApp } from './src/components/BloqueioDoApp';
 
 export default function App() {
   // useMigrations roda as migrações SQL (criar tabelas etc.) toda vez que o app abre.
@@ -39,8 +40,10 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <StatusBar style="auto" />
-      <RootNavigator />
-      <ConquistasGlobais />
+      <BloqueioDoApp>
+        <RootNavigator />
+        <ConquistasGlobais />
+      </BloqueioDoApp>
     </SafeAreaProvider>
   );
 }

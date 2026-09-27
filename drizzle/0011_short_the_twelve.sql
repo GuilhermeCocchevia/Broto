@@ -1,0 +1,1 @@
+ALTER TABLE `configuracoes` ADD `bloqueio_ativo` integer DEFAULT true NOT NULL;

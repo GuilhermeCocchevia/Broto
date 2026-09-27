@@ -25,6 +25,8 @@ export default function ConfiguracoesScreen() {
   const atualizarReduzirAnimacoes = useConfiguracoesStore(
     (state) => state.atualizarReduzirAnimacoes,
   );
+  const bloqueioAtivo = useConfiguracoesStore((state) => state.bloqueioAtivo);
+  const atualizarBloqueioAtivo = useConfiguracoesStore((state) => state.atualizarBloqueioAtivo);
   const carregarConfiguracoes = useConfiguracoesStore((state) => state.carregar);
 
   const carregarCategorias = useCategoriasStore((state) => state.carregar);
@@ -112,6 +114,26 @@ export default function ConfiguracoesScreen() {
             Nacional). Nenhum dado seu é enviado nesse processo: só números públicos são
             recebidos.
           </Text>
+          <View style={styles.linhaSwitch}>
+            <View style={styles.linhaSwitchTexto}>
+              <Text style={styles.itemTitulo}>Bloqueio do app</Text>
+              <Text style={styles.itemDescricao}>
+                Pede Face ID, Touch ID ou o código do aparelho toda vez que o Broto volta pra
+                frente. Se o seu aparelho não tiver nenhum código ou biometria configurada, essa
+                trava não entra em ação.
+              </Text>
+            </View>
+            <Switch
+              accessibilityLabel="Bloqueio do app"
+              accessibilityHint="Pede Face ID, Touch ID ou o código do aparelho ao abrir o app"
+              value={bloqueioAtivo}
+              onValueChange={(valor) => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                atualizarBloqueioAtivo(valor);
+              }}
+              trackColor={{ false: '#D9D0C6', true: colors.primary }}
+            />
+          </View>
         </View>
 
         <View style={styles.secao}>

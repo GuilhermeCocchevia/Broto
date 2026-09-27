@@ -141,6 +141,15 @@ export const configuracoes = sqliteTable('configuracoes', {
   // TutorialScreen.tsx e o useEffect em DashboardScreen.tsx que decide
   // quando abrir automaticamente.
   tutorialConcluido: integer('tutorial_concluido', { mode: 'boolean' }).notNull().default(false),
+  // Pede Face ID/Touch ID/PIN do aparelho toda vez que o app volta pra
+  // frente — decisão consciente de 2026-09-27 (ver Segundo Cérebro):
+  // proteger contra "alguém pega o celular destravado e abre o app", o
+  // cenário mais realista pra um app financeiro pessoal. Default `true`
+  // (a pessoa já escolheu essa proteção; é opt-OUT, não opt-in) — ver
+  // useBloqueioDoApp.ts pra quando o aparelho não tem nenhum código/
+  // biometria configurada (nesse caso a trava simplesmente não ativa,
+  // não há o que exigir).
+  bloqueioAtivo: integer('bloqueio_ativo', { mode: 'boolean' }).notNull().default(true),
 });
 
 // Mesmo padrão singleton-upsert de `configuracoes` (uma linha só, id fixo)
