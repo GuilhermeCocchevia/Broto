@@ -237,6 +237,36 @@ export function calcularQuantidadeDeMesesPorDataFim(dataInicio: string, dataFim:
   return diferencaEmMeses(formatarMes(dataFim), formatarMes(dataInicio)) + 1;
 }
 
+// Mesma ideia de calcularDataFimPorQuantidadeDeMeses, só que em anos — pra
+// uma transação ANUAL (IPVA, seguro...) que não repete pra sempre, ex: "esse
+// financiamento (e o seguro dele) acaba em 4 anos". Reaproveita a mesma
+// função por baixo (1 ano = 12 meses), só troca a unidade que a pessoa
+// digita — ela pensa em anos numa conta anual, não em "48 meses".
+export function calcularDataFimPorQuantidadeDeAnos(dataInicio: string, quantidadeDeAnos: number): string {
+  // "N anos" = N OCORRÊNCIAS anuais (mesmo sentido de "N meses" = N parcelas
+  // mensais) — a última cai (N-1) anos, ou seja (N-1)*12 meses, depois do
+  // início. calcularDataFimPorQuantidadeDeMeses já subtrai 1 sozinha (ver
+  // comentário nela), então pedimos (N-1)*12 + 1 "meses" pra cancelar essa
+  // subtração e sobrar exatamente (N-1)*12: "1 ano" (N=1) dá 0, ou seja, a
+  // própria data de início — igual "1 mês" na mensal.
+  return calcularDataFimPorQuantidadeDeMeses(dataInicio, (quantidadeDeAnos - 1) * 12 + 1);
+}
+
+// Caminho inverso, mesmo espírito de calcularQuantidadeDeMesesPorDataFim —
+// pré-preenche o campo de edição em anos. `Math.round` só por segurança
+// (essa tela é o único lugar que grava a dataFim de uma anual, então a
+// divisão por 12 já devolve um inteiro exato; arredondar evita mostrar algo
+// tipo "2.9999" se um dia essa conta ganhar mais uma casa decimal por outro
+// motivo).
+export function calcularQuantidadeDeAnosPorDataFim(dataInicio: string, dataFim: string): number {
+  // Inverso exato da conta em calcularDataFimPorQuantidadeDeAnos: lá,
+  // calcularQuantidadeDeMesesPorDataFim(...) dá (anos-1)*12 + 1 — então
+  // anos = (isso - 1)/12 + 1. `Math.round` só por segurança de ponto
+  // flutuante (o resultado já é um inteiro exato nesse caminho).
+  const meses = calcularQuantidadeDeMesesPorDataFim(dataInicio, dataFim);
+  return Math.round((meses - 1) / 12) + 1;
+}
+
 // Quantas vezes uma transação recorrente ('mensal' ou 'anual') já ocorreu de
 // VERDADE, contando só entre `dataReferencia` (exclusive) e `hoje` (inclusive).
 // `passoEmMeses` é 1 pra mensal e 12 pra anual. Difere

@@ -4,7 +4,9 @@ import {
   obterSaldoAtual,
   calcularValorDaParcela,
   calcularJurosTotal,
+  calcularDataFimPorQuantidadeDeAnos,
   calcularDataFimPorQuantidadeDeMeses,
+  calcularQuantidadeDeAnosPorDataFim,
   calcularQuantidadeDeMesesPorDataFim,
   avaliarViabilidadeSimulacao,
   avaliarViabilidadeConjunta,
@@ -562,6 +564,45 @@ test('calcularDataFimPorQuantidadeDeMeses: "gruda" no último dia em meses mais 
 test('calcularQuantidadeDeMesesPorDataFim é o caminho inverso de calcularDataFimPorQuantidadeDeMeses', () => {
   expect(calcularQuantidadeDeMesesPorDataFim('2026-03-10', '2027-02-10')).toBe(12);
   expect(calcularQuantidadeDeMesesPorDataFim('2026-03-10', '2026-03-10')).toBe(1);
+});
+
+// --- Refinamento da anual: "repete por quantos anos?" (mesma ideia da
+// mensal, em anos) ---
+test('calcularDataFimPorQuantidadeDeAnos: "repete por 1 ano" termina no próprio ano de início', () => {
+  expect(calcularDataFimPorQuantidadeDeAnos('2026-11-15', 1)).toBe('2026-11-15');
+});
+
+test('calcularDataFimPorQuantidadeDeAnos: soma os anos a partir do início, mantendo mês e dia', () => {
+  expect(calcularDataFimPorQuantidadeDeAnos('2026-11-15', 5)).toBe('2030-11-15');
+});
+
+test('calcularDataFimPorQuantidadeDeAnos: "gruda" no último dia em fevereiro de ano não bissexto', () => {
+  // 29/fev/2024 (bissexto); "2 anos" = essa ocorrência + mais 1, 1 ano depois
+  // (2025, não bissexto) — o dia 29 não existe, "gruda" no 28.
+  expect(calcularDataFimPorQuantidadeDeAnos('2024-02-29', 2)).toBe('2025-02-28');
+  // "5 anos" = 4 anos depois de 2024 → 2028, bissexto de novo, cabe o dia 29.
+  expect(calcularDataFimPorQuantidadeDeAnos('2024-02-29', 5)).toBe('2028-02-29');
+});
+
+test('calcularQuantidadeDeAnosPorDataFim é o caminho inverso de calcularDataFimPorQuantidadeDeAnos', () => {
+  expect(calcularQuantidadeDeAnosPorDataFim('2026-11-15', '2030-11-15')).toBe(5);
+  expect(calcularQuantidadeDeAnosPorDataFim('2026-11-15', '2026-11-15')).toBe(1);
+});
+
+test('anual com dataFim calculada por quantidade de anos realmente para de contar depois', () => {
+  const ipva = criarTransacao({
+    frequencia: 'anual',
+    tipo: 'despesa',
+    valor: 1500,
+    data: '2026-11-15',
+    dataFim: calcularDataFimPorQuantidadeDeAnos('2026-11-15', 3), // último ano: 2028
+    descricao: 'IPVA (financiamento acaba em 3 anos)',
+  });
+  expect(transacaoSeAplicaNoMes(ipva, '2026-11')).toBe(true);
+  expect(transacaoSeAplicaNoMes(ipva, '2027-11')).toBe(true);
+  expect(transacaoSeAplicaNoMes(ipva, '2028-11')).toBe(true);
+  // 4º ano: já passou da dataFim, para de contar.
+  expect(transacaoSeAplicaNoMes(ipva, '2029-11')).toBe(false);
 });
 
 test('avaliarViabilidadeSimulacao: viável quando o saldo nunca fica negativo durante o compromisso', () => {

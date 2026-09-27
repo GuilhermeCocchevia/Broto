@@ -15,7 +15,9 @@ import { CampoData } from '../components/CampoData';
 import { BotaoPrimario } from '../components/BotaoPrimario';
 import { BrilhoCeu } from '../components/CenaGameficada';
 import {
+  calcularDataFimPorQuantidadeDeAnos,
   calcularDataFimPorQuantidadeDeMeses,
+  calcularQuantidadeDeAnosPorDataFim,
   calcularQuantidadeDeMesesPorDataFim,
 } from '../logic/projecao';
 import { mensagemDeErro } from '../utils/mensagemDeErro';
@@ -57,6 +59,12 @@ export default function NovaTransacaoScreen() {
   // data (o que o banco realmente guarda) fica em salvar(), ver
   // calcularDataFimPorQuantidadeDeMeses em logic/projecao.ts.
   const [quantidadeMesesTexto, setQuantidadeMesesTexto] = useState('');
+  // Mesma ideia do campo acima, só que em ANOS — usado só quando
+  // frequencia === 'anual' (ver o campo mais abaixo no JSX). Campo
+  // separado (não reaproveita quantidadeMesesTexto) porque as unidades são
+  // diferentes: trocar de mensal pra anual não devia converter "12 meses"
+  // em "12 anos" sozinho, então cada frequência guarda o próprio rascunho.
+  const [quantidadeAnosTexto, setQuantidadeAnosTexto] = useState('');
   // Nome digitado no campo de categoria — não é mais um id de categoria já
   // escolhida. Resolvido (ou criado, se for nome novo) só na hora de salvar,
   // ver salvar() abaixo. Isso é o que junta "escolher categoria" e "criar
@@ -85,8 +93,13 @@ export default function NovaTransacaoScreen() {
       // que a pessoa digitou — refaz a conta de trás pra frente só pra
       // pré-preencher o campo com um número que faça sentido de novo.
       setQuantidadeMesesTexto(
-        transacao.dataFim
+        transacao.dataFim && transacao.frequencia === 'mensal'
           ? String(calcularQuantidadeDeMesesPorDataFim(transacao.data, transacao.dataFim))
+          : '',
+      );
+      setQuantidadeAnosTexto(
+        transacao.dataFim && transacao.frequencia === 'anual'
+          ? String(calcularQuantidadeDeAnosPorDataFim(transacao.data, transacao.dataFim))
           : '',
       );
       // O campo guarda o NOME da categoria, não o id — então precisa achar
@@ -107,9 +120,9 @@ export default function NovaTransacaoScreen() {
       setErro('Informe um valor válido, maior que zero.');
       return;
     }
-    // Quantidade de meses só faz sentido pra transação mensal, e é opcional
-    // mesmo assim (vazio = repete pra sempre) — por isso só valida se o
-    // usuário de fato preencheu alguma coisa.
+    // Quantidade de meses/anos só faz sentido na frequência correspondente,
+    // e é opcional mesmo assim (vazio = repete pra sempre) — por isso só
+    // valida se o usuário de fato preencheu alguma coisa.
     const quantidadeMeses = Number(quantidadeMesesTexto);
     if (
       frequencia === 'mensal' &&
@@ -117,6 +130,15 @@ export default function NovaTransacaoScreen() {
       (!Number.isInteger(quantidadeMeses) || quantidadeMeses <= 0)
     ) {
       setErro('A quantidade de meses precisa ser um número inteiro maior que zero, ou deixe em branco.');
+      return;
+    }
+    const quantidadeAnos = Number(quantidadeAnosTexto);
+    if (
+      frequencia === 'anual' &&
+      quantidadeAnosTexto.trim() &&
+      (!Number.isInteger(quantidadeAnos) || quantidadeAnos <= 0)
+    ) {
+      setErro('A quantidade de anos precisa ser um número inteiro maior que zero, ou deixe em branco.');
       return;
     }
     if (!categoriaTexto.trim()) {
@@ -150,7 +172,9 @@ export default function NovaTransacaoScreen() {
         dataFim:
           frequencia === 'mensal' && quantidadeMesesTexto.trim()
             ? calcularDataFimPorQuantidadeDeMeses(data, quantidadeMeses)
-            : null,
+            : frequencia === 'anual' && quantidadeAnosTexto.trim()
+              ? calcularDataFimPorQuantidadeDeAnos(data, quantidadeAnos)
+              : null,
       };
       if (idEditando) {
         await atualizar(idEditando, dados);
@@ -247,10 +271,19 @@ export default function NovaTransacaoScreen() {
         </View>
 
         {frequencia === 'anual' && (
-          <Text style={styles.dica}>
-            Repete todo ano, no mesmo mês e dia da data escolhida — como IPVA, IPTU, seguro ou 13º salário. Pra
-            parar de repetir, edite ou exclua.
-          </Text>
+          <>
+            <Text style={styles.dica}>
+              Repete todo ano, no mesmo mês e dia da data escolhida — como IPVA, IPTU, seguro ou 13º salário.
+            </Text>
+            <Text style={styles.rotulo}>Repete por quantos anos? (opcional)</Text>
+            <CampoTexto
+              accessibilityLabel="Repete por quantos anos, opcional"
+              value={quantidadeAnosTexto}
+              onChangeText={setQuantidadeAnosTexto}
+              placeholder="Ex: 5 — deixe em branco pra repetir sempre"
+              keyboardType="number-pad"
+            />
+          </>
         )}
 
         {frequencia === 'mensal' && (
