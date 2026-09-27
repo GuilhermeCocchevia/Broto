@@ -4,8 +4,9 @@ import Svg, { Defs, Ellipse, RadialGradient, Stop } from 'react-native-svg';
 import { colors } from '../theme/colors';
 import { formatarReal } from '../utils/formatarReal';
 import type { MesProjetado } from '../logic/projecao';
-import { formatarMesBr, formatarMesPorExtenso } from '../utils/formatarDataBr';
+import { formatarMesBr } from '../utils/formatarDataBr';
 import { DECORATIVO } from '../utils/acessibilidade';
+import { formatarMesPorExtenso } from '../utils/formatarDataBr';
 
 // Cabeçalho da tabela de meses: diz o que cada número é. Sem ele, o valor da
 // direita (saldo ACUMULADO, que soma a sobra de todos os meses até ali) era lido

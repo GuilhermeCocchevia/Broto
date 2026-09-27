@@ -200,13 +200,18 @@ export default function NovaTransacaoScreen() {
       <BrilhoCeu />
       <ScrollView style={styles.container} contentContainerStyle={styles.conteudo}>
         <Text style={styles.rotulo}>Descrição</Text>
-        <CampoTexto value={descricao} onChangeText={setDescricao} placeholder="Ex: Salário de agosto" />
+        <CampoTexto
+          accessibilityLabel="Descrição"
+          value={descricao}
+          onChangeText={setDescricao}
+          placeholder="Ex: Salário de agosto"
+        />
 
         <Text style={styles.rotulo}>Valor (R$)</Text>
-        <CampoMoeda valor={valor} onChangeValor={setValor} />
+        <CampoMoeda valor={valor} onChangeValor={setValor} acessibilidadeLabel="Valor em reais" />
 
         <Text style={styles.rotulo}>Data</Text>
-        <CampoData valor={data} onChangeValor={setData} atalhosRapidos />
+        <CampoData valor={data} onChangeValor={setData} atalhosRapidos acessibilidadeLabel="Data" />
 
         <Text style={styles.rotulo}>Tipo</Text>
         <View style={styles.opcoes}>
@@ -252,6 +257,7 @@ export default function NovaTransacaoScreen() {
           <>
             <Text style={styles.rotulo}>Repete por quantos meses? (opcional)</Text>
             <CampoTexto
+              accessibilityLabel="Repete por quantos meses, opcional"
               value={quantidadeMesesTexto}
               onChangeText={setQuantidadeMesesTexto}
               placeholder="Ex: 12 — deixe em branco pra repetir sempre"
@@ -269,7 +275,7 @@ export default function NovaTransacaoScreen() {
         />
 
         {frequencia === 'unica' && categoriaCostumaSerAnual(categoriaTexto) && (
-          <Pressable onPress={() => setFrequencia('anual')}>
+          <Pressable accessibilityRole="button" onPress={() => setFrequencia('anual')}>
             <Text style={styles.dica}>
               Essa categoria costuma se repetir todo ano.{' '}
               <Text style={styles.dicaAcao}>Marcar como anual</Text>
@@ -288,7 +294,7 @@ export default function NovaTransacaoScreen() {
         </View>
 
         {idEditando && (
-          <Pressable style={styles.botaoExcluir} onPress={confirmarExclusao}>
+          <Pressable accessibilityRole="button" style={styles.botaoExcluir} onPress={confirmarExclusao}>
             <Text style={styles.botaoExcluirTexto}>Excluir transação</Text>
           </Pressable>
         )}

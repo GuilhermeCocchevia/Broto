@@ -29,6 +29,13 @@ function rotuloDoCorte(percentual: number, ehONecessario: boolean): string {
   return `−${percentual}%${ehONecessario ? ' (o necessário)' : ''}`;
 }
 
+// Como o chip de corte é FALADO pelo leitor de tela: "−10%" em voz alta vira
+// "menos dez por cento", que não diz que é uma redução de gasto.
+export function rotuloFaladoDoCorte(percentual: number, ehONecessario: boolean): string {
+  if (percentual === 0) return 'Manter os gastos como estão';
+  return `Reduzir ${percentual}%${ehONecessario ? ', o necessário pra caber' : ''}`;
+}
+
 // "E se eu gastar menos?" — o usuário experimenta reduzir o gasto do dia a dia
 // (tudo, ou só uma categoria) e o veredito e o gráfico da tela mudam na hora.
 // Tom de exploração, nunca de cobrança: é uma simulação, não uma meta imposta.
@@ -91,7 +98,7 @@ export function EseSeCard({
 
   return (
     <View style={styles.cartao}>
-      <Text style={styles.titulo}>E SE EU GASTAR MENOS?</Text>
+      <Text accessibilityRole="header" style={styles.titulo}>E SE EU GASTAR MENOS?</Text>
       <Text style={styles.subtitulo}>
         {nomeCategoria
           ? `Seu gasto em ${nomeCategoria} é de cerca de ${formatarReal(gastoDoFoco)} por mês. Experimente reduzir e veja o resultado acima.`
@@ -104,6 +111,7 @@ export function EseSeCard({
           <View style={styles.opcoes}>
             <OpcaoBotao
               label={`Tudo · ${reaisInteiros(gastoDoDiaADia)}`}
+              acessibilidadeLabel={`Todo o dia a dia, ${reaisInteiros(gastoDoDiaADia)} por mês`}
               selecionado={foco.tipo === 'geral'}
               onPress={() => onChangeFoco({ tipo: 'geral' })}
             />
@@ -111,6 +119,7 @@ export function EseSeCard({
               <OpcaoBotao
                 key={item.categoriaId}
                 label={`${categoriaPorId.get(item.categoriaId)?.nome ?? 'Categoria'} · ${reaisInteiros(item.valorMensal)}`}
+                acessibilidadeLabel={`${categoriaPorId.get(item.categoriaId)?.nome ?? 'Categoria'}, ${reaisInteiros(item.valorMensal)} por mês`}
                 selecionado={foco.tipo === 'categoria' && foco.categoriaId === item.categoriaId}
                 onPress={() => onChangeFoco({ tipo: 'categoria', categoriaId: item.categoriaId })}
               />
@@ -125,6 +134,7 @@ export function EseSeCard({
           <OpcaoBotao
             key={percentual}
             label={rotuloDoCorte(percentual, percentual === corteNecessario && necessarioForaDoPadrao)}
+            acessibilidadeLabel={rotuloFaladoDoCorte(percentual, percentual === corteNecessario && necessarioForaDoPadrao)}
             selecionado={reducaoPct === percentual}
             onPress={() => onChange(percentual)}
           />

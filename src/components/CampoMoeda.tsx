@@ -17,11 +17,15 @@ export function CampoMoeda({
   onChangeValor,
   placeholder = 'R$ 0,00',
   autoFocus,
+  acessibilidadeLabel = 'Valor em reais',
 }: {
   valor: number;
   onChangeValor: (valor: number) => void;
   placeholder?: string;
   autoFocus?: boolean;
+  // O rótulo visual ("Valor (R$)") é um Text solto acima do campo — o leitor
+  // de tela não o liga ao campo, então o nome vai aqui.
+  acessibilidadeLabel?: string;
 }) {
   return (
     <CampoTexto
@@ -30,6 +34,8 @@ export function CampoMoeda({
       keyboardType="number-pad"
       placeholder={placeholder}
       autoFocus={autoFocus}
+      accessibilityLabel={acessibilidadeLabel}
+      accessibilityHint="Digite só os números; o valor em reais se formata sozinho"
     />
   );
 }

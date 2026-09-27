@@ -74,7 +74,7 @@ export default function ConfiguracoesScreen() {
         contentInsetAdjustmentBehavior="automatic"
       >
         <View style={styles.secao}>
-          <Text style={styles.secaoTitulo}>Acessibilidade</Text>
+          <Text accessibilityRole="header" style={styles.secaoTitulo}>Acessibilidade</Text>
           <View style={styles.linhaSwitch}>
             <View style={styles.linhaSwitchTexto}>
               <Text style={styles.itemTitulo}>Reduzir animações</Text>
@@ -85,6 +85,8 @@ export default function ConfiguracoesScreen() {
               </Text>
             </View>
             <Switch
+              accessibilityLabel="Reduzir animações"
+              accessibilityHint="Para as nuvens e o Brotinho de andar na tela inicial"
               value={reduzirAnimacoes}
               onValueChange={(valor) => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -96,7 +98,7 @@ export default function ConfiguracoesScreen() {
         </View>
 
         <View style={styles.secao}>
-          <Text style={styles.secaoTitulo}>Privacidade</Text>
+          <Text accessibilityRole="header" style={styles.secaoTitulo}>Privacidade</Text>
           <Text style={styles.itemDescricao}>
             O AppBroto não tem login, não envia nada pra nenhum servidor e não usa nenhum tipo de
             rastreamento. Todos os seus dados (transações, categorias, simulações) ficam só neste
@@ -113,12 +115,12 @@ export default function ConfiguracoesScreen() {
         </View>
 
         <View style={styles.secao}>
-          <Text style={styles.secaoTitulo}>Dados e conta</Text>
+          <Text accessibilityRole="header" style={styles.secaoTitulo}>Dados e conta</Text>
           <Text style={styles.itemDescricao}>
             Como não existe login nem nuvem, "sua conta" é o próprio aparelho. Exporte um backup de
             vez em quando pra não depender só deste aparelho.
           </Text>
-          <Pressable
+          <Pressable accessibilityRole="button"
             style={styles.botaoLinha}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -127,14 +129,14 @@ export default function ConfiguracoesScreen() {
           >
             <Text style={styles.botaoLinhaTexto}>Ir para Backup</Text>
           </Pressable>
-          <Pressable style={styles.botaoLinha} onPress={confirmarApagarTudo}>
+          <Pressable accessibilityRole="button" style={styles.botaoLinha} onPress={confirmarApagarTudo}>
             <Text style={styles.botaoLinhaTextoPerigo}>Apagar todos os dados</Text>
           </Pressable>
         </View>
 
         <View style={styles.secao}>
-          <Text style={styles.secaoTitulo}>Conquistas e tutorial</Text>
-          <Pressable
+          <Text accessibilityRole="header" style={styles.secaoTitulo}>Conquistas e tutorial</Text>
+          <Pressable accessibilityRole="button"
             style={styles.botaoLinha}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -143,7 +145,7 @@ export default function ConfiguracoesScreen() {
           >
             <Text style={styles.botaoLinhaTexto}>Ver conquistas</Text>
           </Pressable>
-          <Pressable
+          <Pressable accessibilityRole="button"
             style={styles.botaoLinha}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -155,7 +157,7 @@ export default function ConfiguracoesScreen() {
         </View>
 
         <View style={styles.secao}>
-          <Text style={styles.secaoTitulo}>Sobre</Text>
+          <Text accessibilityRole="header" style={styles.secaoTitulo}>Sobre</Text>
           <Text style={styles.itemDescricao}>
             {appJson.expo.name} · versão {appJson.expo.version}
           </Text>

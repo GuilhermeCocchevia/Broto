@@ -40,6 +40,18 @@ const CORES_DISPONIVEIS = [
   colors.warning,
 ];
 
+// Nome falado de cada cor — o leitor de tela não enxerga a bolinha colorida,
+// então precisa de uma palavra pra ela ("Cor verde", "Cor vermelho"...).
+const NOMES_DAS_CORES: Record<string, string> = {
+  [colors.primary]: 'verde',
+  [colors.primaryDark]: 'verde escuro',
+  [colors.secondary]: 'amarelo',
+  [colors.accent]: 'laranja',
+  [colors.success]: 'verde claro',
+  [colors.danger]: 'vermelho',
+  [colors.warning]: 'âmbar',
+};
+
 // Altura (em px) da faixa mais escura que sobra embaixo da bolinha "de pé"
 // — mesma técnica 3D do resto dos botões do app (ver BotaoPrimario). Some
 // quando a cor está selecionada, ver JSX.
@@ -167,6 +179,7 @@ export default function NovaCategoriaScreen() {
       <ScrollView style={styles.container} contentContainerStyle={styles.conteudo}>
         <Text style={styles.rotulo}>Nome</Text>
         <CampoTexto
+          accessibilityLabel="Nome da categoria"
           value={nome}
           onChangeText={(texto) => {
             setNome(texto);
@@ -217,6 +230,9 @@ export default function NovaCategoriaScreen() {
             const corBase = interpolarCor(corDisponivel, '#000000', 0.3);
             return (
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Cor ${NOMES_DAS_CORES[corDisponivel] ?? 'personalizada'}`}
+                accessibilityState={{ selected: selecionada }}
                 key={corDisponivel}
                 style={[
                   styles.bolinhaMoldura,
@@ -252,7 +268,7 @@ export default function NovaCategoriaScreen() {
         </View>
 
         {idEditando && (
-          <Pressable style={styles.botaoExcluir} onPress={confirmarExclusao}>
+          <Pressable accessibilityRole="button" style={styles.botaoExcluir} onPress={confirmarExclusao}>
             <Text style={styles.botaoExcluirTexto}>Excluir categoria</Text>
           </Pressable>
         )}

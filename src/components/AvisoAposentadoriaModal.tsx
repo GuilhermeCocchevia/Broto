@@ -32,12 +32,12 @@ export function AvisoAposentadoriaModal({ visivel, aoFechar }: { visivel: boolea
 
   return (
     <Modal visible={visivel} transparent animationType="fade" onRequestClose={fechar}>
-      <View style={styles.fundo}>
+      <View style={styles.fundo} accessibilityViewIsModal>
         <View style={styles.moldura}>
           <View style={styles.base}>
             <View style={styles.face}>
               <View style={styles.brilho} pointerEvents="none" />
-              <Text style={styles.titulo}>Antes de simular, alguns fatos importantes</Text>
+              <Text accessibilityRole="header" style={styles.titulo}>Antes de simular, alguns fatos importantes</Text>
 
               <Text style={styles.item}>
                 • O dinheiro fica melhor aplicado se você não precisar dele antes do vencimento — vender
@@ -54,7 +54,7 @@ export function AvisoAposentadoriaModal({ visivel, aoFechar }: { visivel: boolea
                 — já descontado no resultado da simulação.
               </Text>
 
-              <Pressable style={styles.naoMostrar} onPress={naoMostrarNovamente}>
+              <Pressable accessibilityRole="button" style={styles.naoMostrar} onPress={naoMostrarNovamente}>
                 <Text style={styles.naoMostrarTexto}>Não mostrar novamente</Text>
               </Pressable>
 

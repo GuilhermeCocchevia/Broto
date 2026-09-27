@@ -19,10 +19,14 @@ export function OpcaoBotao({
   label,
   selecionado,
   onPress,
+  acessibilidadeLabel,
 }: {
   label: string;
   selecionado: boolean;
   onPress: () => void;
+  // Como o leitor de tela deve FALAR o chip, quando o texto visual não se
+  // lê bem em voz alta (ex: "−10%" → "Reduzir 10%"). Sem ele, usa o `label`.
+  acessibilidadeLabel?: string;
 }) {
   // A cor "de base" (a faixa mais escura) é sempre derivada da cor atual do
   // chip — precisa recalcular quando `selecionado` muda de estado, não dá
@@ -32,6 +36,12 @@ export function OpcaoBotao({
 
   return (
     <Pressable
+      // O chip é um botão que pode estar "selecionado" (a opção escolhida):
+      // o estado `selected` faz o VoiceOver falar "selecionado" — sem isso,
+      // quem não enxerga a cor verde não sabe qual opção está valendo.
+      accessibilityRole="button"
+      accessibilityLabel={acessibilidadeLabel ?? label}
+      accessibilityState={{ selected: selecionado }}
       style={[styles.moldura, { backgroundColor: corBase }]}
       onPress={() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

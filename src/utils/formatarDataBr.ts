@@ -29,3 +29,24 @@ export function formatarMesBr(mes: string): string {
   const [ano, numero] = mes.split('-');
   return `${numero}/${ano}`;
 }
+
+const NOMES_DOS_MESES = [
+  'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+  'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro',
+];
+
+// 'AAAA-MM-DD' → "26 de setembro de 2026" — o jeito que o leitor de tela
+// (VoiceOver/TalkBack) deve FALAR uma data. "26/09/2026" ele lê como três
+// números soltos; por extenso a pessoa entende de primeira. Lista de meses
+// escrita à mão (em vez de Intl/toLocaleDateString) pra o texto ser igual em
+// qualquer aparelho e no Jest, sem depender de dados de idioma do motor JS.
+export function formatarDataPorExtenso(iso: string): string {
+  const [ano, mes, dia] = iso.split('-').map(Number);
+  return `${dia} de ${NOMES_DOS_MESES[mes - 1]} de ${ano}`;
+}
+
+// 'AAAA-MM' → "setembro de 2026" (pra falar um mês, ex: "menor saldo em…").
+export function formatarMesPorExtenso(mes: string): string {
+  const [ano, numero] = mes.split('-').map(Number);
+  return `${NOMES_DOS_MESES[numero - 1]} de ${ano}`;
+}

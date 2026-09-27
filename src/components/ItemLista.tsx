@@ -48,8 +48,19 @@ export function ItemLista({
   // `<Svg>`, então dois brilhos com o mesmo id colidiriam se algum
   // aparelho/versão reaproveitasse a definição errada.
   const idGradiente = useId();
+  // Uma linha = UM elemento pro leitor de tela, lida de uma vez ("Aluguel.
+  // Despesa · 10/09/2026. -R$ 1.200,00"), em vez de ele parar em cada pedaço
+  // (bolinha, título, subtítulo, valor). O marcador (bolinha/moeda/brilho) é
+  // só enfeite, some da leitura por ficar dentro do elemento agrupado.
+  const rotuloFalado = [titulo, subtitulo, valorTexto].filter(Boolean).join('. ');
   return (
-    <Pressable style={styles.item} onPress={onPress}>
+    <Pressable
+      accessible
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityLabel={rotuloFalado}
+      style={styles.item}
+      onPress={onPress}
+    >
       {moeda ? (
         <View style={styles.moeda}>
           <View style={styles.moedaBrilho} />

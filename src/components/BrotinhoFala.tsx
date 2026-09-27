@@ -38,7 +38,7 @@ export function BrotinhoFala({
         <View style={styles.balaoBase}>
           <View style={styles.balaoFace}>
             <View style={styles.balaoBrilho} pointerEvents="none" />
-            {titulo && <Text style={styles.titulo}>{titulo}</Text>}
+            {titulo && <Text accessibilityRole="header" style={styles.titulo}>{titulo}</Text>}
             <Text style={styles.texto}>{children}</Text>
           </View>
         </View>

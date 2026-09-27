@@ -156,6 +156,11 @@ export default function CompararSimulacoesScreen() {
                     : `Compra · ${simulacao.parcelas}x de ${formatarReal(valorDaParcela)}`;
             return (
               <Pressable
+                // Escolher várias simulações = caixinhas de marcar: o papel
+                // "checkbox" + `checked` faz o leitor dizer "marcado/não marcado".
+                accessibilityRole="checkbox"
+                accessibilityLabel={`${simulacao.descricao}. ${subtitulo}`}
+                accessibilityState={{ checked: selecionada }}
                 key={simulacao.id}
                 style={styles.linhaSelecao}
                 onPress={() => alternarSelecao(simulacao.id)}

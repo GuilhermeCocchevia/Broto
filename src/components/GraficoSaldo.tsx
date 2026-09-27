@@ -10,6 +10,7 @@ import { GraficoApex, apexDisponivel } from './GraficoApex';
 import { FATOR_IMPREVISTOS } from '../logic/cenariosDeProjecao';
 import { calcularMesesDeGastoCobertos } from '../logic/saudeFinanceira';
 import type { MesProjetado } from '../logic/projecao';
+import { resumirGraficoParaLeitor } from '../logic/resumoDoGrafico';
 
 // Largura do gráfico = largura da tela menos o padding da tela (24 de cada
 // lado, ver `conteudo` em SimuladorScreen) — sem isso o gráfico ou vaza da
@@ -61,8 +62,8 @@ function calcularCorDaLinha(saldoAtual: number, meses: MesProjetado[]): string {
 export function GraficoSaldo(props: PropsDoGrafico) {
   const [apexFalhou, setApexFalhou] = useState(false);
 
-  if (props.meses.length > 0 && !apexFalhou && apexDisponivel()) {
-    return (
+  const grafico =
+    props.meses.length > 0 && !apexFalhou && apexDisponivel() ? (
       <GraficoApex
         saldoAtual={props.saldoAtual}
         meses={props.meses}
@@ -70,9 +71,24 @@ export function GraficoSaldo(props: PropsDoGrafico) {
         corLinha={calcularCorDaLinha(props.saldoAtual, props.meses)}
         onFalha={() => setApexFalhou(true)}
       />
+    ) : (
+      <GraficoSaldoNativo {...props} />
     );
-  }
-  return <GraficoSaldoNativo {...props} />;
+
+  // O gráfico é uma imagem (WebView/SVG) — pro leitor de tela é um "buraco".
+  // Um único elemento com papel de imagem e um resumo falado dos números
+  // (ver resumirGraficoParaLeitor) diz o que o desenho mostra; a tabela de
+  // meses logo abaixo detalha cada mês.
+  return (
+    <View
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={resumirGraficoParaLeitor(props.saldoAtual, props.meses, props.mesesPesado)}
+      style={styles.acessivel}
+    >
+      {grafico}
+    </View>
+  );
 }
 
 function GraficoSaldoNativo({ saldoAtual, meses, mesesPesado }: PropsDoGrafico) {
@@ -221,6 +237,11 @@ function GraficoSaldoNativo({ saldoAtual, meses, mesesPesado }: PropsDoGrafico) 
 }
 
 const styles = StyleSheet.create({
+  // Sem largura própria o `View` de acessibilidade encolheria pro conteúdo e o
+  // gráfico (que usa 100%) colapsaria.
+  acessivel: {
+    width: '100%',
+  },
   legenda: {
     marginTop: 4,
     fontSize: 12,

@@ -12,7 +12,12 @@ import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import * as Haptics from 'expo-haptics';
 import { colors } from '../theme/colors';
-import { converterDateParaIso, converterIsoParaDate, formatarDataBr } from '../utils/formatarDataBr';
+import {
+  converterDateParaIso,
+  converterIsoParaDate,
+  formatarDataBr,
+  formatarDataPorExtenso,
+} from '../utils/formatarDataBr';
 
 // 'AAAA-MM-DD' de hoje/ontem — mesmo cálculo simples usado em toda tela que
 // já inicializa data com "hoje" (ex: `new Date().toISOString().slice(0,10)`),
@@ -31,9 +36,13 @@ export function CampoData({
   valor,
   onChangeValor,
   atalhosRapidos = false,
+  acessibilidadeLabel = 'Data',
 }: {
   valor: string;
   onChangeValor: (valor: string) => void;
+  // Nome do campo pro leitor de tela ("Data", "Data de início"...) — o
+  // rótulo visual fica num Text solto acima, que o leitor não liga ao campo.
+  acessibilidadeLabel?: string;
   // "Hoje"/"Ontem" — só faz sentido em campos onde isso é comum (ex: data
   // de uma compra), não em toda data do app (ex: vencimento de
   // aposentadoria, décadas no futuro).
@@ -63,6 +72,10 @@ export function CampoData({
   return (
     <View>
       <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${acessibilidadeLabel}: ${formatarDataPorExtenso(valor)}`}
+        accessibilityHint={aberto ? 'Fecha o seletor de data' : 'Abre o seletor para escolher outra data'}
+        accessibilityState={{ expanded: aberto }}
         style={[styles.campo, aberto && styles.campoAberto]}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -74,10 +87,20 @@ export function CampoData({
 
       {atalhosRapidos && (
         <View style={styles.atalhos}>
-          <Pressable style={styles.atalhoBotao} onPress={() => selecionar(isoDeHoje())}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Usar a data de hoje"
+            style={styles.atalhoBotao}
+            onPress={() => selecionar(isoDeHoje())}
+          >
             <Text style={styles.atalhoTexto}>Hoje</Text>
           </Pressable>
-          <Pressable style={styles.atalhoBotao} onPress={() => selecionar(isoDeOntem())}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Usar a data de ontem"
+            style={styles.atalhoBotao}
+            onPress={() => selecionar(isoDeOntem())}
+          >
             <Text style={styles.atalhoTexto}>Ontem</Text>
           </Pressable>
         </View>
@@ -93,7 +116,12 @@ export function CampoData({
             onChange={aoMudarNoSeletor}
           />
           {Platform.OS === 'ios' && (
-            <Pressable style={styles.concluido} onPress={() => setAberto(false)}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Concluído, fechar o seletor de data"
+              style={styles.concluido}
+              onPress={() => setAberto(false)}
+            >
               <Text style={styles.concluidoTexto}>Concluído</Text>
             </Pressable>
           )}

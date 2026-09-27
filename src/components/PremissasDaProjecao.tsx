@@ -34,7 +34,7 @@ export function PremissasDaProjecao({ premissas }: { premissas: PremissasDeProje
 
   return (
     <View style={styles.cartao}>
-      <Text style={styles.titulo}>COMO CALCULEI</Text>
+      <Text accessibilityRole="header" style={styles.titulo}>COMO CALCULEI</Text>
 
       <Linha rotulo="Renda esperada" valor={`${formatarReal(premissas.rendaEsperada)}/mês`} />
       <Linha rotulo="Despesas fixas" valor={`${formatarReal(premissas.despesasFixas)}/mês`} />

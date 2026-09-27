@@ -134,21 +134,21 @@ export default function ExtratoScreen() {
 
         {fixas.length > 0 && (
           <>
-            <Text style={styles.secaoTitulo}>Fixas mensais</Text>
+            <Text accessibilityRole="header" style={styles.secaoTitulo}>Fixas mensais</Text>
             <View style={styles.lista}>{fixas.map(renderizarLinha)}</View>
           </>
         )}
 
         {anuais.length > 0 && (
           <>
-            <Text style={styles.secaoTitulo}>Anuais</Text>
+            <Text accessibilityRole="header" style={styles.secaoTitulo}>Anuais</Text>
             <View style={styles.lista}>{anuais.map(renderizarLinha)}</View>
           </>
         )}
 
         {unicas.length > 0 && (
           <>
-            <Text style={styles.secaoTitulo}>Únicas</Text>
+            <Text accessibilityRole="header" style={styles.secaoTitulo}>Únicas</Text>
             <View style={styles.lista}>{unicas.map(renderizarLinha)}</View>
           </>
         )}

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, type ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { AccessibilityInfo, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
@@ -9,6 +9,7 @@ import { CabecalhoDosMeses, LinhaMesProjetado } from './LinhaMesProjetado';
 import { corDoSaldo } from '../utils/corPorValor';
 import { calcularMesesDeGastoCobertos } from '../logic/saudeFinanceira';
 import type { MesProjetado, ResultadoViabilidade } from '../logic/projecao';
+import { DECORATIVO } from '../utils/acessibilidade';
 
 // O bloco "veredito + gráfico + tabela" — compartilhado entre a tela de
 // detalhe de UMA simulação (DetalheSimulacaoScreen) e a de avaliação
@@ -42,6 +43,20 @@ export function PainelViabilidade({
   // Cenário mais pesado, desenhado como linha tracejada no gráfico.
   mesesPesado?: MesProjetado[];
 }) {
+  // Leitor de tela: quando o veredito ou a mensagem MUDAM por uma ação da
+  // pessoa (ex: escolheu "−10%" no "e se"), o foco continua no botão tocado e
+  // ela não sabe o que aconteceu — então o novo veredito é anunciado em voz
+  // alta. Pula a primeira renderização (senão anunciaria ao abrir a tela).
+  const mensagemAtual = resultado.viavel ? mensagemViavel : mensagemNaoViavel;
+  const primeiraRenderizacao = useRef(true);
+  useEffect(() => {
+    if (primeiraRenderizacao.current) {
+      primeiraRenderizacao.current = false;
+      return;
+    }
+    AccessibilityInfo.announceForAccessibility(`${resultado.viavel ? 'Dá pra fazer!' : 'Cuidado'}. ${mensagemAtual}`);
+  }, [resultado.viavel, mensagemAtual]);
+
   // Toque no corpo confirma o veredito mesmo sem olhar pra tela — mesmo
   // padrão de "reforçar pelo toque" usado em salvar/excluir no resto do
   // app, só que aqui é informativo, não uma confirmação de ação. Só
@@ -71,19 +86,23 @@ export function PainelViabilidade({
       <View
         style={[styles.veredito, resultado.viavel ? styles.veredictoViavel : styles.veredictoNaoViavel]}
       >
-        <SymbolView
-          name={resultado.viavel ? 'checkmark.circle.fill' : 'exclamationmark.triangle.fill'}
-          size={28}
-          tintColor={resultado.viavel ? colors.primaryDark : colors.danger}
-          fallback={
-            <Ionicons
-              name={resultado.viavel ? 'checkmark-circle' : 'warning-outline'}
-              size={28}
-              color={resultado.viavel ? colors.primaryDark : colors.danger}
-            />
-          }
-        />
+        {/* Ícone só repete o que o título já diz ("Dá pra fazer!"/"Cuidado"). */}
+        <View {...DECORATIVO}>
+          <SymbolView
+            name={resultado.viavel ? 'checkmark.circle.fill' : 'exclamationmark.triangle.fill'}
+            size={28}
+            tintColor={resultado.viavel ? colors.primaryDark : colors.danger}
+            fallback={
+              <Ionicons
+                name={resultado.viavel ? 'checkmark-circle' : 'warning-outline'}
+                size={28}
+                color={resultado.viavel ? colors.primaryDark : colors.danger}
+              />
+            }
+          />
+        </View>
         <Text
+          accessibilityRole="header"
           style={[styles.veredictoTitulo, { color: resultado.viavel ? colors.primaryDark : colors.danger }]}
         >
           {resultado.viavel ? 'Dá pra fazer!' : 'Cuidado'}

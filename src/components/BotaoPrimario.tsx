@@ -20,13 +20,23 @@ export function BotaoPrimario({
   label,
   onPress,
   desabilitado = false,
+  acessibilidadeHint,
 }: {
   label: string;
   onPress: () => void;
   desabilitado?: boolean;
+  // Frase curta dizendo O QUE acontece ao tocar, quando o rótulo sozinho não
+  // deixa claro (ex: "Salva a transação e volta pra tela anterior").
+  acessibilidadeHint?: string;
 }) {
   return (
     <Pressable
+      // Leitor de tela: sem o papel "button" o VoiceOver lê só o texto, sem
+      // avisar que dá pra tocar; o estado "disabled" faz ele falar "esmaecido".
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint={acessibilidadeHint}
+      accessibilityState={{ disabled: desabilitado }}
       style={[styles.moldura, desabilitado && styles.desabilitado]}
       onPress={() => {
         if (desabilitado) return;

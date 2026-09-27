@@ -3,6 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Animated, Dimensions, Easing, StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { colors } from '../theme/colors';
+import { DECORATIVO } from '../utils/acessibilidade';
 
 // Largura da tela — pra nuvem começar/terminar sempre bem fora da área
 // visível, não importa o aparelho.
@@ -264,7 +265,7 @@ export function CenaCeu({
   reduzirMovimento?: boolean;
 }) {
   return (
-    <View style={[styles.ceuContainer, style]} pointerEvents="none">
+    <View {...DECORATIVO} style={[styles.ceuContainer, style]} pointerEvents="none">
       <LinearGradient
         colors={[colors.cenaCeuTopo, colors.cenaCeuBase]}
         style={StyleSheet.absoluteFill}
@@ -320,6 +321,7 @@ export function CenaCeu({
 export function BrilhoCeu({ style }: { style?: object }) {
   return (
     <LinearGradient
+      {...DECORATIVO}
       colors={['rgba(94, 200, 242, 0.16)', 'rgba(94, 200, 242, 0)']}
       style={[styles.brilhoCeu, style]}
       pointerEvents="none"
@@ -347,7 +349,7 @@ export function CenaChao({
   reduzirMovimento?: boolean;
 }) {
   return (
-    <View style={[styles.chaoContainer, { height: ALTURA_FAIXA_CHAO + alturaExtra }]}>
+    <View {...DECORATIVO} style={[styles.chaoContainer, { height: ALTURA_FAIXA_CHAO + alturaExtra }]}>
       <View style={styles.grama} />
       <Brotinho reduzirMovimento={reduzirMovimento} />
     </View>

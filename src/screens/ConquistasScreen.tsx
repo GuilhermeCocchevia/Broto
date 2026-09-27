@@ -9,7 +9,7 @@ import { useSimulacoesStore } from '../store/useSimulacoesStore';
 import { useConquistasStore } from '../store/useConquistasStore';
 import { avaliarConquistasElegiveis, CONQUISTAS, type Conquista } from '../logic/conquistas';
 import { mesAtualLocal } from '../utils/dataLocal';
-import { formatarDataBr } from '../utils/formatarDataBr';
+import { formatarDataBr, formatarDataPorExtenso } from '../utils/formatarDataBr';
 
 // Lista de marcos que só sobem — nunca uma pontuação que cai com um mês
 // ruim (ver logic/conquistas.ts pro raciocínio completo). Cada conquista já
@@ -80,7 +80,19 @@ function LinhaConquista({
   desbloqueadaEm: string | undefined;
 }) {
   return (
-    <View style={[styles.linha, !conquistada && styles.linhaTrancada]}>
+    // Uma conquista = UM elemento lido por inteiro, dizendo se já foi ganha
+    // ou ainda está trancada (o cadeado e as cores não chegam ao leitor).
+    <View
+      accessible
+      accessibilityLabel={
+        conquistada
+          ? `${conquista.titulo}. Conquistada. ${conquista.descricao}${
+              desbloqueadaEm ? `. Desde ${formatarDataPorExtenso(desbloqueadaEm.slice(0, 10))}` : ''
+            }`
+          : `${conquista.titulo}. Ainda trancada. Como conseguir: ${conquista.comoConseguir}`
+      }
+      style={[styles.linha, !conquistada && styles.linhaTrancada]}
+    >
       <View style={[styles.selo, conquistada ? styles.seloConquistado : styles.seloTrancado]}>
         <SymbolView
           name={(conquistada ? conquista.icone : 'lock.fill') as never}

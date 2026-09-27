@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SymbolView } from 'expo-symbols';
 import { colors } from '../theme/colors';
+import { DECORATIVO } from '../utils/acessibilidade';
 
 // Aviso de "preenchi isso pra você" — mesmo molde "de painel estático" dos
 // cartões do Dashboard (contorno escuro + base 3D fixa + tira de brilho no
@@ -17,7 +18,7 @@ export function AvisoPreenchimento({ children }: { children: ReactNode }) {
         <View style={styles.face}>
           <View style={styles.brilho} pointerEvents="none" />
           <View style={styles.cabecalho}>
-            <View style={styles.selo}>
+            <View {...DECORATIVO} style={styles.selo}>
               <SymbolView
                 name="sparkles"
                 size={12}

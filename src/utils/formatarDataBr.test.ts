@@ -1,4 +1,11 @@
-import { converterIsoParaDate, converterDateParaIso, formatarDataBr, formatarMesBr } from './formatarDataBr';
+import {
+  converterIsoParaDate,
+  converterDateParaIso,
+  formatarDataBr,
+  formatarMesBr,
+  formatarDataPorExtenso,
+  formatarMesPorExtenso,
+} from './formatarDataBr';
 
 test('formatarDataBr troca AAAA-MM-DD por DD/MM/AAAA', () => {
   expect(formatarDataBr('2026-09-16')).toBe('16/09/2026');
@@ -26,4 +33,15 @@ test('formatarMesBr troca AAAA-MM por MM/AAAA', () => {
   expect(formatarMesBr('2027-09')).toBe('09/2027');
   expect(formatarMesBr('2026-12')).toBe('12/2026');
   expect(formatarMesBr('2027-01')).toBe('01/2027');
+});
+
+test('formatarDataPorExtenso fala a data por extenso, sem zero à esquerda no dia', () => {
+  expect(formatarDataPorExtenso('2026-09-26')).toBe('26 de setembro de 2026');
+  expect(formatarDataPorExtenso('2027-01-05')).toBe('5 de janeiro de 2027');
+  expect(formatarDataPorExtenso('2026-03-01')).toBe('1 de março de 2026');
+});
+
+test('formatarMesPorExtenso fala o mês e o ano por extenso', () => {
+  expect(formatarMesPorExtenso('2027-12')).toBe('dezembro de 2027');
+  expect(formatarMesPorExtenso('2026-02')).toBe('fevereiro de 2026');
 });

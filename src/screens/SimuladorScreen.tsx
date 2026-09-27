@@ -134,7 +134,7 @@ export default function SimuladorScreen() {
                 ? `Depois de despesas e simulações ativas, ainda sobram ~${formatarReal(sobraMensal)}/mês.`
                 : `Depois das suas despesas, ainda sobram ~${formatarReal(sobraMensal)}/mês.`}
             </Text>
-            <Pressable
+            <Pressable accessibilityRole="button"
               style={styles.avisoSobraBotaoMoldura}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -175,7 +175,7 @@ export default function SimuladorScreen() {
             resto do app) pra não competir visualmente com "+ nova
             simulação". */}
         {simulacoes.length >= 2 && (
-          <Pressable
+          <Pressable accessibilityRole="button"
             style={styles.botaoComparar}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

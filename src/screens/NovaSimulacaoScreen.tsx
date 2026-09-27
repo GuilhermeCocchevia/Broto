@@ -603,6 +603,23 @@ export default function NovaSimulacaoScreen() {
     aporteInicial,
   ]);
 
+  // Os rótulos mudam com o tipo de simulação. Ficam em constantes porque são
+  // usados DUAS vezes: no texto visual acima do campo e como nome do campo pro
+  // leitor de tela (o Text solto não fica ligado ao campo).
+  const rotuloValor = perguntaPelaMeta
+    ? 'Quanto você quer ter? (R$)'
+    : perguntaPeloAporte || ehEconomiaSimples
+      ? 'Quanto você quer guardar por mês? (R$)'
+      : 'Valor total (R$)';
+  const rotuloTaxa =
+    tipo === 'compra'
+      ? 'Taxa de juros ao mês, em % (opcional)'
+      : taxaObrigatoria
+        ? 'Taxa de rendimento ao mês, em %'
+        : 'Taxa de rendimento ao mês, em % (opcional)';
+  const rotuloParcelas = ehModalidadeDeGuardarDinheiro ? 'Em quantos meses?' : 'Parcelas (1 = à vista)';
+  const rotuloDataInicio = ehModalidadeDeGuardarDinheiro ? 'A partir de quando?' : 'Data da 1ª parcela';
+
   return (
     <View style={styles.wrapper}>
       <BrilhoCeu />
@@ -642,7 +659,7 @@ export default function NovaSimulacaoScreen() {
           // ver fim do JSX) — esse link só existe pra reabrir de propósito,
           // caso a pessoa tenha fechado sem ler direito ou marcado "não
           // mostrar novamente" e queira reler depois.
-          <Pressable
+          <Pressable accessibilityRole="button"
             style={styles.linkAvisos}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -676,6 +693,7 @@ export default function NovaSimulacaoScreen() {
 
         <Text style={styles.rotulo}>Descrição</Text>
         <CampoTexto
+          accessibilityLabel="Descrição"
           value={descricao}
           onChangeText={setDescricao}
           placeholder={
@@ -689,19 +707,17 @@ export default function NovaSimulacaoScreen() {
           }
         />
 
-        <Text style={styles.rotulo}>
-          {perguntaPelaMeta
-            ? 'Quanto você quer ter? (R$)'
-            : perguntaPeloAporte || ehEconomiaSimples
-              ? 'Quanto você quer guardar por mês? (R$)'
-              : 'Valor total (R$)'}
-        </Text>
-        <CampoMoeda valor={valor} onChangeValor={setValor} />
+        <Text style={styles.rotulo}>{rotuloValor}</Text>
+        <CampoMoeda valor={valor} onChangeValor={setValor} acessibilidadeLabel={rotuloValor} />
 
         {ehMetaDeInvestimento && (
           <>
             <Text style={styles.rotulo}>Investimento inicial, se já tiver algo guardado (R$, opcional)</Text>
-            <CampoMoeda valor={aporteInicial} onChangeValor={setAporteInicial} />
+            <CampoMoeda
+              valor={aporteInicial}
+              onChangeValor={setAporteInicial}
+              acessibilidadeLabel="Investimento inicial, se já tiver algo guardado, em reais, opcional"
+            />
             {ehSugestaoDeSobra && tipo === 'rendimento' && aporteInicialSugerido > 0 && (
               <Text style={styles.dica}>
                 Sugestão: o que passa de um mês de despesas no seu saldo, pra nunca faltar dinheiro nas
@@ -713,14 +729,9 @@ export default function NovaSimulacaoScreen() {
 
         {mostrarCampoDeTaxa && (
           <>
-            <Text style={styles.rotulo}>
-              {tipo === 'compra'
-                ? 'Taxa de juros ao mês, em % (opcional)'
-                : taxaObrigatoria
-                  ? 'Taxa de rendimento ao mês, em %'
-                  : 'Taxa de rendimento ao mês, em % (opcional)'}
-            </Text>
+            <Text style={styles.rotulo}>{rotuloTaxa}</Text>
             <CampoTexto
+              accessibilityLabel={rotuloTaxa}
               value={taxaJurosTexto}
               onChangeText={setTaxaJurosTexto}
               placeholder={
@@ -739,12 +750,14 @@ export default function NovaSimulacaoScreen() {
           <View style={styles.blocoTaxas}>
             <View style={styles.blocoTaxasCabecalho}>
               <Text style={styles.blocoTaxasTitulo}>Taxas de referência</Text>
-              <Pressable
+              <Pressable accessibilityRole="button"
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   taxasReferencia.atualizar();
                 }}
                 disabled={taxasReferencia.atualizando}
+                accessibilityLabel="Atualizar as taxas de referência"
+                accessibilityState={{ disabled: taxasReferencia.atualizando, busy: taxasReferencia.atualizando }}
               >
                 <Text style={styles.blocoTaxasAtualizar}>
                   {taxasReferencia.atualizando ? 'Atualizando...' : 'Atualizar'}
@@ -803,12 +816,13 @@ export default function NovaSimulacaoScreen() {
         {ehAposentadoria ? (
           <>
             <Text style={styles.rotulo}>Até quando? (data-alvo)</Text>
-            <CampoData valor={dataAlvoTexto} onChangeValor={setDataAlvoTexto} />
+            <CampoData valor={dataAlvoTexto} onChangeValor={setDataAlvoTexto} acessibilidadeLabel="Data-alvo" />
           </>
         ) : (
           <>
-            <Text style={styles.rotulo}>{ehModalidadeDeGuardarDinheiro ? 'Em quantos meses?' : 'Parcelas (1 = à vista)'}</Text>
+            <Text style={styles.rotulo}>{rotuloParcelas}</Text>
             <CampoTexto
+              accessibilityLabel={rotuloParcelas}
               value={parcelasTexto}
               onChangeText={setParcelasTexto}
               placeholder={ehModalidadeDeGuardarDinheiro ? 'Ex: 12' : 'Ex: 10'}
@@ -886,10 +900,8 @@ export default function NovaSimulacaoScreen() {
           </View>
         )}
 
-        <Text style={styles.rotulo}>
-          {ehModalidadeDeGuardarDinheiro ? 'A partir de quando?' : 'Data da 1ª parcela'}
-        </Text>
-        <CampoData valor={dataInicio} onChangeValor={setDataInicio} atalhosRapidos />
+        <Text style={styles.rotulo}>{rotuloDataInicio}</Text>
+        <CampoData valor={dataInicio} onChangeValor={setDataInicio} atalhosRapidos acessibilidadeLabel={rotuloDataInicio} />
 
         <Text style={styles.rotulo}>Categoria</Text>
         <CampoCategoria
@@ -910,7 +922,7 @@ export default function NovaSimulacaoScreen() {
         </View>
 
         {idEditando && (
-          <Pressable style={styles.botaoExcluir} onPress={confirmarExclusao}>
+          <Pressable accessibilityRole="button" style={styles.botaoExcluir} onPress={confirmarExclusao}>
             <Text style={styles.botaoExcluirTexto}>Excluir simulação</Text>
           </Pressable>
         )}

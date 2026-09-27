@@ -194,10 +194,11 @@ export default function BackupScreen() {
           />
         </View>
 
-        <Pressable
+        <Pressable accessibilityRole="button"
           style={[styles.botaoSecundario, importando && styles.botaoDesabilitado]}
           onPress={importar}
           disabled={exportando || importando}
+          accessibilityState={{ disabled: exportando || importando, busy: importando }}
         >
           <Text style={styles.botaoSecundarioTexto}>
             {importando ? 'Restaurando...' : 'Importar backup'}

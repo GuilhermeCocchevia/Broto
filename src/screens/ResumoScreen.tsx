@@ -75,7 +75,7 @@ export default function ResumoScreen() {
       >
         <Text style={styles.subtitle}>Sua saúde financeira este mês.</Text>
 
-        <Text style={styles.secaoTitulo}>Pra onde foi seu dinheiro</Text>
+        <Text accessibilityRole="header" style={styles.secaoTitulo}>Pra onde foi seu dinheiro</Text>
         {gastoPorCategoria.length === 0 ? (
           <Text style={styles.listaVazia}>Nenhuma despesa registrada este mês ainda.</Text>
         ) : (
@@ -116,7 +116,11 @@ export default function ResumoScreen() {
         )}
 
         <View style={styles.cartoes}>
-          <View style={styles.cartao}>
+          <View
+            accessible
+            accessibilityLabel={`${formatarPorcentagem(taxaDePoupanca)} guardado este mês`}
+            style={styles.cartao}
+          >
             <SymbolView
               name="banknote.fill"
               size={20}
@@ -126,7 +130,11 @@ export default function ResumoScreen() {
             <Text style={styles.cartaoValor}>{formatarPorcentagem(taxaDePoupanca)}</Text>
             <Text style={styles.cartaoRotulo}>guardado este mês</Text>
           </View>
-          <View style={styles.cartao}>
+          <View
+            accessible
+            accessibilityLabel={`${formatarPorcentagem(comprometimentoDeRendaFixa)} da renda já é conta fixa`}
+            style={styles.cartao}
+          >
             <SymbolView
               name="doc.text.fill"
               size={20}

@@ -16,6 +16,7 @@
 // nada que já usa este componente precisa mudar.
 import Svg, { G, Path, Rect } from 'react-native-svg';
 import { colors } from '../theme/colors';
+import { DECORATIVO } from '../utils/acessibilidade';
 
 export type PoseBrotinho = 'neutro' | 'comemorando' | 'pensativo';
 
@@ -102,7 +103,7 @@ function Estrela({ cx, cy, tamanho, rotacao = 0 }: { cx: number; cy: number; tam
 
 export function Brotinho({ pose, size = 96 }: { pose: PoseBrotinho; size?: number }) {
   return (
-    <Svg width={size} height={size * PROPORCAO_BROTINHO} viewBox="0 0 120 170">
+    <Svg {...DECORATIVO} width={size} height={size * PROPORCAO_BROTINHO} viewBox="0 0 120 170">
       {pose === 'neutro' && (
         <>
           <Corpo />

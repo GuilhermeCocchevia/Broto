@@ -95,7 +95,12 @@ export default function TutorialScreen() {
             <View key={item.titulo} style={[styles.ponto, i === indice && styles.pontoAtivo]} />
           ))}
         </View>
-        <Pressable onPress={pular} hitSlop={12}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Pular o tutorial"
+          onPress={pular}
+          hitSlop={12}
+        >
           <Text style={styles.pular}>Pular</Text>
         </Pressable>
       </View>

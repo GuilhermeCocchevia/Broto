@@ -29,6 +29,7 @@ import { curiosidadesInvestimento } from '../data/curiosidadesInvestimento';
 import { escolherProximaCuriosidade } from '../logic/curiosidades';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { mesAtualLocal } from '../utils/dataLocal';
+import { DECORATIVO } from '../utils/acessibilidade';
 
 // Paleta só desta tela — mais "aterrada" que as cores vivas do resto do
 // app (colors.primary/secondary/etc, ver theme/colors.ts), de propósito:
@@ -205,6 +206,9 @@ export default function DashboardScreen() {
             profundidade. Pressionar aqui só escurece a face, sem cortar a
             forma. */}
         <Pressable
+          // Botão só com ícone: sem nome, o leitor de tela diria apenas "botão".
+          accessibilityRole="button"
+          accessibilityLabel="Configurações"
           style={[styles.botaoEngrenagemMoldura, { top: insets.top + 16 }]}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -240,12 +244,17 @@ export default function DashboardScreen() {
               em cima é só a assinatura do app, mais sóbria. */}
           <View style={styles.tituloContainer}>
             <IconeBroto size={22} color={COR_MARCA} />
-            <Text style={styles.title}>Broto</Text>
+            <Text accessibilityRole="header" style={styles.title}>Broto</Text>
           </View>
-          <Text style={[styles.saldoAtual, saldoAtual < 0 && styles.saldoNegativo]}>
+          {/* O saldo e seu rótulo são lidos juntos ("Valor disponível: R$ 0,00");
+              o rótulo visual fica escondido do leitor pra não ser repetido. */}
+          <Text
+            accessibilityLabel={`Valor disponível: ${formatarReal(saldoAtual)}`}
+            style={[styles.saldoAtual, saldoAtual < 0 && styles.saldoNegativo]}
+          >
             {formatarReal(saldoAtual)}
           </Text>
-          <Text style={styles.subtitle}>Valor Disponível</Text>
+          <Text {...DECORATIVO} style={styles.subtitle}>Valor Disponível</Text>
         </View>
 
         {/* `flex: 1` + `justifyContent: 'center'`: ocupa todo o espaço que
@@ -332,8 +341,14 @@ export default function DashboardScreen() {
             <View style={styles.painelBase}>
               <View style={styles.painelFace}>
                 <View style={styles.painelBrilho} pointerEvents="none" />
-                <Text style={styles.orcamentoRotulo}>ORÇAMENTO DO MÊS</Text>
-                <View style={styles.orcamentoTrilho}>
+                <Text accessibilityRole="header" style={styles.orcamentoRotulo}>ORÇAMENTO DO MÊS</Text>
+                <View
+                  style={styles.orcamentoTrilho}
+                  accessible
+                  accessibilityRole="progressbar"
+                  accessibilityLabel="Gastos do mês em relação ao teto que sua meta permite"
+                  accessibilityValue={{ min: 0, max: 100, now: Math.round(orcamento.percentual * 100) }}
+                >
                   <View
                     style={[
                       styles.orcamentoPreenchimento,
@@ -355,6 +370,8 @@ export default function DashboardScreen() {
                 <Text style={styles.orcamentoMensagem}>{orcamento.situacao.mensagem}</Text>
                 {orcamento.situacao.nivel === 'nao-cabe' && (
                   <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Rever gastos"
                     style={styles.orcamentoConviteBotaoMoldura}
                     onPress={() => {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -382,12 +399,14 @@ export default function DashboardScreen() {
             <View style={styles.painelBase}>
               <View style={styles.painelFace}>
                 <View style={styles.painelBrilho} pointerEvents="none" />
-                <Text style={styles.orcamentoRotulo}>ORÇAMENTO DO MÊS</Text>
+                <Text accessibilityRole="header" style={styles.orcamentoRotulo}>ORÇAMENTO DO MÊS</Text>
                 <Text style={styles.orcamentoConviteTexto}>
                   Crie uma meta de economia no Simulador pra acompanhar aqui quanto ainda dá pra gastar sem
                   comprometer ela.
                 </Text>
                 <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Criar meta de economia"
                   style={styles.orcamentoConviteBotaoMoldura}
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -498,6 +517,8 @@ function BotaoMenu({
 
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
       style={[
         styles.botaoMenuMoldura,
         grande && styles.botaoMenuMolduraGrande,

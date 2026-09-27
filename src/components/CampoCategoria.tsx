@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { AccessibilityInfo, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../theme/colors';
 import { OpcaoBotao } from './OpcaoBotao';
 import { CampoTexto } from './CampoTexto';
@@ -86,6 +86,18 @@ export function CampoCategoria({
 
   const mostrarSugestoes = estado === 'digitando' && sugestoes.length > 0;
 
+  // As sugestões aparecem sozinhas conforme a pessoa digita — quem usa leitor
+  // de tela não VÊ a lista surgir. Um aviso curto diz que existem e quantas
+  // são (só quando a quantidade muda, pra não repetir a cada letra igual).
+  const quantidadeDeSugestoes = mostrarSugestoes ? sugestoes.length : 0;
+  useEffect(() => {
+    if (quantidadeDeSugestoes > 0) {
+      AccessibilityInfo.announceForAccessibility(
+        `${quantidadeDeSugestoes} ${quantidadeDeSugestoes === 1 ? 'sugestão' : 'sugestões'} de categoria abaixo do campo`,
+      );
+    }
+  }, [quantidadeDeSugestoes]);
+
   // O aviso "vai criar categoria nova" só aparece depois de uma escolha
   // confirmada (tocou num chip de categoria que ainda não existia) — não
   // aparece só de digitar, pra não piscar uma mensagem a cada letra antes
@@ -104,6 +116,8 @@ export function CampoCategoria({
           setEstado('digitando');
         }}
         placeholder="Ex: Alimentação, Salário..."
+        accessibilityLabel="Categoria"
+        accessibilityHint="Digite o nome; aparecem sugestões, ou uma categoria nova é criada ao salvar"
       />
 
       {mostrarSugestoes && (
@@ -112,6 +126,9 @@ export function CampoCategoria({
             <OpcaoBotao
               key={sugestao.nome}
               label={sugestao.jaExiste ? sugestao.nome : `+ ${sugestao.nome}`}
+              acessibilidadeLabel={
+                sugestao.jaExiste ? `Usar a categoria ${sugestao.nome}` : `Criar a categoria ${sugestao.nome}`
+              }
               selecionado={false}
               onPress={() => {
                 onChangeValor(sugestao.nome);

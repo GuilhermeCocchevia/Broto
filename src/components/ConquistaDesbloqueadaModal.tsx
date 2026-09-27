@@ -8,7 +8,7 @@
 // moldura (um cartão dentro de outro cartão) — esse balão fica reservado
 // pro Tutorial, onde ele É o conteúdo principal da tela, não um elemento
 // dentro de mais uma caixa.
-import { Modal, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Modal, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useEffect } from 'react';
 import { colors } from '../theme/colors';
@@ -30,7 +30,14 @@ export function ConquistaDesbloqueadaModal({
   // PainelViabilidade, que também vibra na entrada de um resultado
   // importante, só disparando quando a conquista muda de verdade.
   useEffect(() => {
-    if (conquista) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (conquista) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      // O modal aparece sozinho, sem a pessoa ter tocado em nada — sem esse
+      // aviso, quem usa leitor de tela nem saberia que ganhou uma conquista.
+      AccessibilityInfo.announceForAccessibility(
+        `Conquista desbloqueada: ${conquista.titulo}. ${conquista.descricao}`,
+      );
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conquista?.chave]);
 
@@ -38,12 +45,12 @@ export function ConquistaDesbloqueadaModal({
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={aoFechar}>
-      <View style={styles.fundo}>
+      <View style={styles.fundo} accessibilityViewIsModal>
         <View style={styles.moldura}>
           <View style={styles.base}>
             <View style={styles.face}>
               <View style={styles.brilho} pointerEvents="none" />
-              <Text style={styles.selo}>CONQUISTA DESBLOQUEADA</Text>
+              <Text accessibilityRole="header" style={styles.selo}>CONQUISTA DESBLOQUEADA</Text>
 
               <View style={styles.linha}>
                 <Brotinho pose="comemorando" size={80} />

@@ -52,7 +52,12 @@ export default function AtualizarSaldoScreen() {
       <BrilhoCeu />
       <ScrollView style={styles.container} contentContainerStyle={styles.conteudo}>
         <Text style={styles.rotulo}>Quanto você tem agora, no total?</Text>
-        <CampoMoeda valor={valorAbsoluto} onChangeValor={setValorAbsoluto} autoFocus />
+        <CampoMoeda
+          valor={valorAbsoluto}
+          onChangeValor={setValorAbsoluto}
+          autoFocus
+          acessibilidadeLabel="Quanto você tem agora, no total, em reais"
+        />
 
         <View style={styles.opcoes}>
           <OpcaoBotao
