@@ -175,22 +175,34 @@ function Brotinho({ reduzirMovimento = false }: { reduzirMovimento?: boolean }) 
     // (trocamos por uma corrente de `.start(callback)` pra poder sortear
     // uma pausa diferente a cada volta, ver abaixo).
     let cancelado = false;
+    // A perna (ou a pausa entre pernas) que está rodando AGORA — guardada
+    // pra poder chamar `.stop()` nela no cleanup. `cancelado` sozinho só
+    // impedia a PRÓXIMA perna de começar; a que já estava em andamento
+    // (useNativeDriver, roda na thread nativa) continuava até o fim mesmo
+    // com a `Animated.View` já desmontada, e ficava tentando mandar
+    // `onAnimatedValueUpdate` pra um listener que não existia mais — daí o
+    // aviso "Sending onAnimatedValueUpdate with no listeners registered."
+    let animacaoAtual: Animated.CompositeAnimation | null = null;
 
     function andarUmaPerna(destino: number, proximoSentido: number) {
-      Animated.timing(posicaoX, {
+      const perna = Animated.timing(posicaoX, {
         toValue: destino,
         duration: DURACAO_TRAVESSIA_MS,
         // `Easing.out` acelera rápido no começo e desacelera suave no
         // fim — parece menos "robótico" que o `inOut` simétrico de antes.
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
-      }).start(({ finished }) => {
+      });
+      animacaoAtual = perna;
+      perna.start(({ finished }) => {
         if (!finished || cancelado) return;
         // Espelha o corpo já virado pro próximo lado, mas só DEPOIS de
         // uma pausinha — como se o Broto "pensasse" antes de voltar.
         viradoParaEsquerda.setValue(proximoSentido);
         const pausaMs = 150 + Math.random() * 150;
-        Animated.delay(pausaMs).start(({ finished: pausaTerminou }) => {
+        const pausa = Animated.delay(pausaMs);
+        animacaoAtual = pausa;
+        pausa.start(({ finished: pausaTerminou }) => {
           if (!pausaTerminou || cancelado) return;
           andarUmaPerna(-destino, -proximoSentido);
         });
@@ -218,6 +230,7 @@ function Brotinho({ reduzirMovimento = false }: { reduzirMovimento?: boolean }) 
 
     return () => {
       cancelado = true;
+      animacaoAtual?.stop();
       passinhos.stop();
     };
   }, [posicaoX, viradoParaEsquerda, passinho, reduzirMovimento]);
