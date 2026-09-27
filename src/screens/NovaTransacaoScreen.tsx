@@ -20,6 +20,7 @@ import {
   calcularQuantidadeDeAnosPorDataFim,
   calcularQuantidadeDeMesesPorDataFim,
 } from '../logic/projecao';
+import { nomearParcela, redimensionarParcelas, type RascunhoDeParcela } from '../logic/parcelasAnuais';
 import { mensagemDeErro } from '../utils/mensagemDeErro';
 import { escolherCorAutomatica, encontrarCategoriaPorNome } from '../utils/resolverOuCriarCategoria';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -65,6 +66,17 @@ export default function NovaTransacaoScreen() {
   // diferentes: trocar de mensal pra anual não devia converter "12 meses"
   // em "12 anos" sozinho, então cada frequência guarda o próprio rascunho.
   const [quantidadeAnosTexto, setQuantidadeAnosTexto] = useState('');
+  // Atalho pra criar uma conta anual já dividida em parcelas (ex: 13º
+  // salário em 2x, IPTU em 10x) — só existe na hora de CRIAR (nunca ao
+  // editar, ver `!idEditando` no JSX): cada parcela vira sua própria
+  // transação 'anual' independente ao salvar (ver salvar() e
+  // logic/parcelasAnuais.ts), não um novo conceito no banco.
+  const [dividirEmParcelas, setDividirEmParcelas] = useState(false);
+  const [quantidadeParcelasTexto, setQuantidadeParcelasTexto] = useState('2');
+  const [parcelas, setParcelas] = useState<RascunhoDeParcela[]>([
+    { data: hojeLocal(), valor: 0 },
+    { data: hojeLocal(), valor: 0 },
+  ]);
   // Nome digitado no campo de categoria — não é mais um id de categoria já
   // escolhida. Resolvido (ou criado, se for nome novo) só na hora de salvar,
   // ver salvar() abaixo. Isso é o que junta "escolher categoria" e "criar
@@ -79,6 +91,29 @@ export default function NovaTransacaoScreen() {
   useEffect(() => {
     navigation.setOptions({ title: idEditando ? 'Editar transação' : 'Nova transação' });
   }, [navigation, idEditando]);
+
+  // Trocar de frequência enquanto "Em parcelas" está ativo deixaria o
+  // formulário num estado sem sentido (parcelas só existem pra anual) — sai
+  // de "Anual" e o atalho desliga sozinho, sem exigir que a pessoa lembre
+  // de desligar na mão.
+  function escolherFrequencia(nova: Frequencia) {
+    setFrequencia(nova);
+    if (nova !== 'anual') setDividirEmParcelas(false);
+  }
+
+  function mudarQuantidadeDeParcelas(texto: string) {
+    setQuantidadeParcelasTexto(texto);
+    const quantidade = Number(texto);
+    // Só redimensiona com um número válido — enquanto a pessoa apaga o
+    // campo pra digitar de novo (fica vazio por um instante), a lista de
+    // parcelas continua como estava em vez de sumir.
+    if (!Number.isInteger(quantidade) || quantidade < 2) return;
+    setParcelas((atual) => redimensionarParcelas(atual, quantidade));
+  }
+
+  function atualizarParcela(indice: number, mudanca: Partial<RascunhoDeParcela>) {
+    setParcelas((atual) => atual.map((parcela, i) => (i === indice ? { ...parcela, ...mudanca } : parcela)));
+  }
 
   useEffect(() => {
     if (!idEditando) return;
@@ -116,8 +151,15 @@ export default function NovaTransacaoScreen() {
       setErro('Preencha a descrição.');
       return;
     }
-    if (valor <= 0) {
+    // Dividindo em parcelas, o campo "Valor" único nem aparece (cada
+    // parcela tem o próprio) — valida a lista de parcelas em vez dele.
+    const dividindo = frequencia === 'anual' && dividirEmParcelas && !idEditando;
+    if (!dividindo && valor <= 0) {
       setErro('Informe um valor válido, maior que zero.');
+      return;
+    }
+    if (dividindo && parcelas.some((parcela) => parcela.valor <= 0)) {
+      setErro('Informe um valor válido, maior que zero, em cada parcela.');
       return;
     }
     // Quantidade de meses/anos só faz sentido na frequência correspondente,
@@ -162,24 +204,46 @@ export default function NovaTransacaoScreen() {
             cor: escolherCorAutomatica(categorias.length),
           });
 
-      const dados = {
-        descricao: descricao.trim(),
-        valor,
-        data,
-        tipo,
-        categoriaId,
-        frequencia,
-        dataFim:
-          frequencia === 'mensal' && quantidadeMesesTexto.trim()
-            ? calcularDataFimPorQuantidadeDeMeses(data, quantidadeMeses)
-            : frequencia === 'anual' && quantidadeAnosTexto.trim()
-              ? calcularDataFimPorQuantidadeDeAnos(data, quantidadeAnos)
+      if (dividindo) {
+        // Cada parcela é uma INSERT própria — mesma chamada que qualquer
+        // transação nova usaria, só repetida. Sequencial (não Promise.all)
+        // pra não disparar várias escritas concorrentes no SQLite de uma
+        // vez; com no máximo umas poucas parcelas, o custo é irrelevante.
+        const total = parcelas.length;
+        for (let indice = 0; indice < total; indice++) {
+          const parcela = parcelas[indice];
+          await adicionar({
+            descricao: nomearParcela(descricao.trim(), indice, total),
+            valor: parcela.valor,
+            data: parcela.data,
+            tipo,
+            categoriaId,
+            frequencia: 'anual',
+            dataFim: quantidadeAnosTexto.trim()
+              ? calcularDataFimPorQuantidadeDeAnos(parcela.data, quantidadeAnos)
               : null,
-      };
-      if (idEditando) {
-        await atualizar(idEditando, dados);
+          });
+        }
       } else {
-        await adicionar(dados);
+        const dados = {
+          descricao: descricao.trim(),
+          valor,
+          data,
+          tipo,
+          categoriaId,
+          frequencia,
+          dataFim:
+            frequencia === 'mensal' && quantidadeMesesTexto.trim()
+              ? calcularDataFimPorQuantidadeDeMeses(data, quantidadeMeses)
+              : frequencia === 'anual' && quantidadeAnosTexto.trim()
+                ? calcularDataFimPorQuantidadeDeAnos(data, quantidadeAnos)
+                : null,
+        };
+        if (idEditando) {
+          await atualizar(idEditando, dados);
+        } else {
+          await adicionar(dados);
+        }
       }
       // Toque de sucesso — confirma pelo "corpo" que gravou, sem precisar
       // olhar pra tela nesse instante exato (ela já está saindo).
@@ -231,11 +295,17 @@ export default function NovaTransacaoScreen() {
           placeholder="Ex: Salário de agosto"
         />
 
-        <Text style={styles.rotulo}>Valor (R$)</Text>
-        <CampoMoeda valor={valor} onChangeValor={setValor} acessibilidadeLabel="Valor em reais" />
+        {/* Escondidos dividindo em parcelas: cada parcela tem a própria data
+            e o próprio valor, mais abaixo (ver o bloco de "Anual"). */}
+        {!(frequencia === 'anual' && dividirEmParcelas && !idEditando) && (
+          <>
+            <Text style={styles.rotulo}>Valor (R$)</Text>
+            <CampoMoeda valor={valor} onChangeValor={setValor} acessibilidadeLabel="Valor em reais" />
 
-        <Text style={styles.rotulo}>Data</Text>
-        <CampoData valor={data} onChangeValor={setData} atalhosRapidos acessibilidadeLabel="Data" />
+            <Text style={styles.rotulo}>Data</Text>
+            <CampoData valor={data} onChangeValor={setData} atalhosRapidos acessibilidadeLabel="Data" />
+          </>
+        )}
 
         <Text style={styles.rotulo}>Tipo</Text>
         <View style={styles.opcoes}>
@@ -256,17 +326,17 @@ export default function NovaTransacaoScreen() {
           <OpcaoBotao
             label="Avulsa (única vez)"
             selecionado={frequencia === 'unica'}
-            onPress={() => setFrequencia('unica')}
+            onPress={() => escolherFrequencia('unica')}
           />
           <OpcaoBotao
             label="Mensal (repete)"
             selecionado={frequencia === 'mensal'}
-            onPress={() => setFrequencia('mensal')}
+            onPress={() => escolherFrequencia('mensal')}
           />
           <OpcaoBotao
             label="Anual (1x por ano)"
             selecionado={frequencia === 'anual'}
-            onPress={() => setFrequencia('anual')}
+            onPress={() => escolherFrequencia('anual')}
           />
         </View>
 
@@ -275,6 +345,64 @@ export default function NovaTransacaoScreen() {
             <Text style={styles.dica}>
               Repete todo ano, no mesmo mês e dia da data escolhida — como IPVA, IPTU, seguro ou 13º salário.
             </Text>
+
+            {/* Só na CRIAÇÃO: uma vez salva, cada parcela já é uma transação
+                comum, sem nada de especial pra reabrir aqui ao editar. */}
+            {!idEditando && (
+              <>
+                <Text style={styles.rotulo}>Como lançar</Text>
+                <View style={styles.opcoes}>
+                  <OpcaoBotao
+                    label="De uma vez"
+                    selecionado={!dividirEmParcelas}
+                    onPress={() => setDividirEmParcelas(false)}
+                  />
+                  <OpcaoBotao
+                    label="Em parcelas"
+                    selecionado={dividirEmParcelas}
+                    onPress={() => setDividirEmParcelas(true)}
+                  />
+                </View>
+              </>
+            )}
+
+            {dividirEmParcelas && !idEditando && (
+              <>
+                <Text style={styles.dica}>
+                  Cada parcela vira uma transação anual própria (ex: "13º salário (1/2)"), com sua própria data e
+                  seu próprio valor — editar ou excluir uma depois não mexe nas outras.
+                </Text>
+                <Text style={styles.rotulo}>Quantas parcelas?</Text>
+                <CampoTexto
+                  accessibilityLabel="Quantas parcelas"
+                  value={quantidadeParcelasTexto}
+                  onChangeText={mudarQuantidadeDeParcelas}
+                  placeholder="Ex: 2"
+                  keyboardType="number-pad"
+                />
+
+                {parcelas.map((parcela, indice) => (
+                  <View key={indice} style={styles.parcela}>
+                    <Text style={styles.parcelaTitulo}>
+                      {nomearParcela('Parcela', indice, parcelas.length)}
+                    </Text>
+                    <Text style={styles.rotulo}>Data</Text>
+                    <CampoData
+                      valor={parcela.data}
+                      onChangeValor={(novaData) => atualizarParcela(indice, { data: novaData })}
+                      acessibilidadeLabel={`Data da parcela ${indice + 1}`}
+                    />
+                    <Text style={styles.rotulo}>Valor (R$)</Text>
+                    <CampoMoeda
+                      valor={parcela.valor}
+                      onChangeValor={(novoValor) => atualizarParcela(indice, { valor: novoValor })}
+                      acessibilidadeLabel={`Valor da parcela ${indice + 1}`}
+                    />
+                  </View>
+                ))}
+              </>
+            )}
+
             <Text style={styles.rotulo}>Repete por quantos anos? (opcional)</Text>
             <CampoTexto
               accessibilityLabel="Repete por quantos anos, opcional"
@@ -308,7 +436,7 @@ export default function NovaTransacaoScreen() {
         />
 
         {frequencia === 'unica' && categoriaCostumaSerAnual(categoriaTexto) && (
-          <Pressable accessibilityRole="button" onPress={() => setFrequencia('anual')}>
+          <Pressable accessibilityRole="button" onPress={() => escolherFrequencia('anual')}>
             <Text style={styles.dica}>
               Essa categoria costuma se repetir todo ano.{' '}
               <Text style={styles.dicaAcao}>Marcar como anual</Text>
@@ -320,7 +448,15 @@ export default function NovaTransacaoScreen() {
 
         <View style={styles.botaoSalvar}>
           <BotaoPrimario
-            label={salvando ? 'Salvando...' : idEditando ? 'Salvar alterações' : 'Salvar'}
+            label={
+              salvando
+                ? 'Salvando...'
+                : idEditando
+                  ? 'Salvar alterações'
+                  : frequencia === 'anual' && dividirEmParcelas
+                    ? `Salvar as ${parcelas.length} parcelas`
+                    : 'Salvar'
+            }
             onPress={salvar}
             desabilitado={salvando}
           />
@@ -368,6 +504,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+  },
+  // Uma faixa por parcela, separada da anterior por uma linha fina — mesmo
+  // tom usado como divisor em listas do resto do app (ex: linhas do
+  // extrato), não uma caixa nova.
+  parcela: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.background,
+  },
+  parcelaTitulo: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.text,
   },
   erro: {
     color: colors.danger,
