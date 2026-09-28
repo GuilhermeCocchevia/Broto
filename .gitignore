@@ -42,3 +42,6 @@ yarn-error.*
 
 # ApexCharts embutido (gerado no postinstall, ver scripts/gerar-apexcharts-embutido.js)
 /src/charts/apexchartsEmbutido.ts
+
+# backups locais
+*.bak
