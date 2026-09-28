@@ -15,6 +15,7 @@ import { useCenarios } from '../hooks/useCenarios';
 import {
   descreverOndeCorta,
   montarAvisoDeFolga,
+  nomeCategoriaEmFoco,
   sugestaoParaMetaDeGuardar,
   temFaixaDeCenarios,
   type Avaliador,
@@ -42,7 +43,6 @@ export default function DetalheSimulacaoScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'DetalheSimulacao'>>();
   const { id } = route.params;
 
-  const categorias = useCategoriasStore((state) => state.categorias);
   const carregarCategorias = useCategoriasStore((state) => state.carregar);
   const transacoes = useTransacoesStore((state) => state.transacoes);
   const carregarTransacoes = useTransacoesStore((state) => state.carregar);
@@ -137,7 +137,7 @@ export default function DetalheSimulacaoScreen() {
   const reducaoMensal = sugestao.reducaoMensal;
 
   // Com um corte do "e se" escolhido, o veredito descreve ESSE cenário.
-  const ondeCorta = descreverOndeCorta(foco.tipo === 'categoria' ? categoriaPorId.get(foco.categoriaId)?.nome : undefined);
+  const ondeCorta = descreverOndeCorta(nomeCategoriaEmFoco(foco, categoriaPorId));
   const comEseSe = reducaoPct > 0 ? `Com ${reducaoPct}% a menos ${ondeCorta}, ` : '';
   const minuscula = (texto: string) => texto.charAt(0).toLowerCase() + texto.slice(1);
   const avisoDeFolga = montarAvisoDeFolga(cenarios.esperado, cenarios.pesado);

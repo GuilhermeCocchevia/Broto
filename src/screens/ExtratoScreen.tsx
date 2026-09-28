@@ -43,7 +43,6 @@ function ordenarComReceitasPrimeiro(lista: Transacao[]): Transacao[] {
 // isso fica difícil de enxergar de relance.
 export default function ExtratoScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const categorias = useCategoriasStore((state) => state.categorias);
   const carregarCategorias = useCategoriasStore((state) => state.carregar);
   const transacoes = useTransacoesStore((state) => state.transacoes);
   const carregandoTransacoes = useTransacoesStore((state) => state.carregando);

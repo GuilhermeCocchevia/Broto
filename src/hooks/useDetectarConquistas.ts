@@ -47,6 +47,5 @@ export function useDetectarConquistas() {
       desbloquear(chave);
       enfileirar(chave);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transacoes, simulacoes, conquistasCarregadas, desbloqueadas, desbloquear, enfileirar]);
 }

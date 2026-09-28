@@ -82,7 +82,7 @@ export default function ConfiguracoesScreen() {
               <Text style={styles.itemTitulo}>Reduzir animações</Text>
               <Text style={styles.itemDescricao}>
                 Para as nuvens e o Brotinho de andar na tela inicial. Se o seu aparelho já tem
-                "Reduzir Movimento" ativado nos Ajustes do sistema, as animações já ficam
+                &quot;Reduzir Movimento&quot; ativado nos Ajustes do sistema, as animações já ficam
                 paradas automaticamente, mesmo com esse interruptor desligado.
               </Text>
             </View>
@@ -109,7 +109,7 @@ export default function ConfiguracoesScreen() {
           </Text>
           <Text style={styles.itemDescricao}>
             Única exceção: nas simulações de Rendimento e Aposentadoria, se você tocar em
-            "Atualizar" nas taxas de referência, o app busca — só nesse momento, nunca sozinho —
+            &quot;Atualizar&quot; nas taxas de referência, o app busca — só nesse momento, nunca sozinho —
             taxas públicas (Selic e CDI do Banco Central, taxas do Tesouro Direto do Tesouro
             Nacional). Nenhum dado seu é enviado nesse processo: só números públicos são
             recebidos.
@@ -139,7 +139,7 @@ export default function ConfiguracoesScreen() {
         <View style={styles.secao}>
           <Text accessibilityRole="header" style={styles.secaoTitulo}>Dados e conta</Text>
           <Text style={styles.itemDescricao}>
-            Como não existe login nem nuvem, "sua conta" é o próprio aparelho. Exporte um backup de
+            Como não existe login nem nuvem, &quot;sua conta&quot; é o próprio aparelho. Exporte um backup de
             vez em quando pra não depender só deste aparelho.
           </Text>
           <Pressable accessibilityRole="button"

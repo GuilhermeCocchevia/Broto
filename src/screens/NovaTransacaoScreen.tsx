@@ -369,7 +369,7 @@ export default function NovaTransacaoScreen() {
             {dividirEmParcelas && !idEditando && (
               <>
                 <Text style={styles.dica}>
-                  Cada parcela vira uma transação anual própria (ex: "13º salário (1/2)"), com sua própria data e
+                  Cada parcela vira uma transação anual própria (ex: &quot;13º salário (1/2)&quot;), com sua própria data e
                   seu próprio valor — editar ou excluir uma depois não mexe nas outras.
                 </Text>
                 <Text style={styles.rotulo}>Quantas parcelas?</Text>

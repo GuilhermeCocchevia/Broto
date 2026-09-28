@@ -11,6 +11,7 @@ import {
   FATOR_IMPREVISTOS,
   listarItensDoDiaADiaPorCategoria,
   montarAvisoDeFolga,
+  nomeCategoriaEmFoco,
   sugestaoParaMetaDeGuardar,
   temFaixaDeCenarios,
   totalDaCategoriaNoDiaADia,
@@ -19,7 +20,7 @@ import {
 import { avaliarViabilidadeSimulacao, type ResultadoViabilidade } from './projecao';
 import { formatarMesBr } from '../utils/formatarDataBr';
 import { estimarGastosFuturos, type EstimativaDeGastos } from './estimativaDeGastos';
-import type { Simulacao, Transacao } from '../types/models';
+import type { Categoria, Simulacao, Transacao } from '../types/models';
 
 function criarTransacao(sobrescrever: Partial<Transacao>): Transacao {
   return {
@@ -427,4 +428,17 @@ test('categoria pequena demais pra resolver sozinha: não culpa as despesas fixa
 test('descreverOndeCorta: "no dia a dia" no geral, "em <categoria>" com foco', () => {
   expect(descreverOndeCorta()).toBe('no dia a dia');
   expect(descreverOndeCorta('Lazer')).toBe('em Lazer');
+});
+
+test('nomeCategoriaEmFoco: acha o nome no mapa quando o foco é uma categoria, undefined no foco geral ou categoria sem cadastro', () => {
+  const categoriaPorId = new Map<string, Categoria>([
+    ['lazer', { id: 'lazer', nome: 'Lazer', tipo: 'despesa', cor: '#000' }],
+  ]);
+
+  expect(nomeCategoriaEmFoco({ tipo: 'categoria', categoriaId: 'lazer' }, categoriaPorId)).toBe('Lazer');
+  expect(nomeCategoriaEmFoco({ tipo: 'geral' }, categoriaPorId)).toBeUndefined();
+  // Categoria referenciada no foco mas apagada/não encontrada no mapa: não
+  // quebra, só não tem nome pra mostrar (descreverOndeCorta cai pro "no dia
+  // a dia" genérico nesse caso).
+  expect(nomeCategoriaEmFoco({ tipo: 'categoria', categoriaId: 'inexistente' }, categoriaPorId)).toBeUndefined();
 });

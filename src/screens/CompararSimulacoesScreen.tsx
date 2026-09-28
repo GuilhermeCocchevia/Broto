@@ -14,6 +14,7 @@ import { useCenarios } from '../hooks/useCenarios';
 import {
   descreverOndeCorta,
   montarAvisoDeFolga,
+  nomeCategoriaEmFoco,
   sugestaoParaMetaDeGuardar,
   temFaixaDeCenarios,
   type Avaliador,
@@ -105,7 +106,7 @@ export default function CompararSimulacoesScreen() {
   const mensagens = useMemo(() => {
     if (!resultado || !cenarios) return null;
     const nomes = simulacoesEscolhidas.map((s) => `"${s.descricao}"`).join(' + ');
-    const ondeCorta = descreverOndeCorta(foco.tipo === 'categoria' ? categoriaPorId.get(foco.categoriaId)?.nome : undefined);
+    const ondeCorta = descreverOndeCorta(nomeCategoriaEmFoco(foco, categoriaPorId));
     const comEseSe = reducaoPct > 0 ? `Com ${reducaoPct}% a menos ${ondeCorta}, ` : '';
     const avisoDeFolga = montarAvisoDeFolga(cenarios.esperado, cenarios.pesado);
     const situacao = `${reducaoPct > 0 ? `${comEseSe}fazendo` : 'Fazendo'} ${nomes} ao mesmo tempo, seu saldo fica negativo em ${formatarMesBr(resultado.piorMes)} (ficaria em ${formatarReal(resultado.piorSaldo)}).`;

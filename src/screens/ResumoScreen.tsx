@@ -30,7 +30,6 @@ import { mesAtualLocal } from '../utils/dataLocal';
 // confiável em outro lugar; não fazia mais sentido manter uma terceira
 // versão separada, mais fraca, dessa mesma ideia.
 export default function ResumoScreen() {
-  const categorias = useCategoriasStore((state) => state.categorias);
   const carregarCategorias = useCategoriasStore((state) => state.carregar);
   const transacoes = useTransacoesStore((state) => state.transacoes);
   const carregarTransacoes = useTransacoesStore((state) => state.carregar);

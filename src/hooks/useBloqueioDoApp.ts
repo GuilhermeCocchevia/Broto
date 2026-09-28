@@ -16,10 +16,9 @@ import { useConfiguracoesStore } from '../store/useConfiguracoesStore';
 // inteiro. Sem o módulo, a trava simplesmente não ativa — "app calmo,
 // nunca sem saída" vale também pra bug de ambiente, não só pra decisão de
 // produto.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let LocalAuthentication: any = null;
 try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   LocalAuthentication = require('expo-local-authentication');
 } catch {
   LocalAuthentication = null;

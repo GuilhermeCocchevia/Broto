@@ -140,7 +140,7 @@ export function CampoCategoria({
       )}
 
       {confirmouCategoriaNova && (
-        <Text style={styles.aviso}>Vai criar a categoria "{valor.trim()}" automaticamente.</Text>
+        <Text style={styles.aviso}>Vai criar a categoria &quot;{valor.trim()}&quot; automaticamente.</Text>
       )}
     </View>
   );

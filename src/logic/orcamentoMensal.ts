@@ -24,7 +24,6 @@ import type { Simulacao, Transacao } from '../types/models';
 import {
   transacaoSeAplicaNoMes,
   projetarFluxoDeCaixaDiario,
-  agruparFluxoDiarioPorMes,
   type PontoDeCaixa,
   type MesProjetado,
 } from './projecao';

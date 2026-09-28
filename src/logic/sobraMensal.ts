@@ -1,5 +1,5 @@
 // "Quanto sobra por mês, depois de despesas reais e simulações já ativas?"
-// — mesmo espírito de reservaDeEmergencia.ts: lógica pura derivada das
+// — mesmo espírito de orcamentoMensal.ts: lógica pura derivada das
 // transações/simulações, sem depender de tela/banco.
 import type { Simulacao } from '../types/models';
 import { calcularSaidaEfetivaNoMes, simulacaoAtivaNoMes } from './projecao';

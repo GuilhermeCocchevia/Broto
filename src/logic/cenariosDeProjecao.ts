@@ -6,6 +6,7 @@ import type { EstimativaDeGastos } from './estimativaDeGastos';
 import { calcularReducaoMensalNecessaria, type ResultadoViabilidade } from './projecao';
 import { formatarReal } from '../utils/formatarReal';
 import { formatarMesBr } from '../utils/formatarDataBr';
+import type { Categoria } from '../types/models';
 
 // Uma categoria do "dia a dia" (variável OU recorrente na prática) e quanto
 // dela entra na projeção por mês — a lista que alimenta o seletor do 'e se
@@ -344,4 +345,12 @@ export function sugestaoParaMetaDeGuardar({
 // o "e se" está cortando.
 export function descreverOndeCorta(nomeCategoria?: string): string {
   return nomeCategoria ? `em ${nomeCategoria}` : 'no dia a dia';
+}
+
+// Nome da categoria em foco no "e se" (ver FocoDoCorte/EseSeCard), já pronto
+// pra passar em descreverOndeCorta — as telas de veredito (Detalhe e
+// Comparar) repetiam essa mesma checagem `foco.tipo === 'categoria' ? ... :
+// undefined` cada uma à sua moda; reaproveitado pra nunca divergirem.
+export function nomeCategoriaEmFoco(foco: FocoDoCorte, categoriaPorId: Map<string, Categoria>): string | undefined {
+  return foco.tipo === 'categoria' ? categoriaPorId.get(foco.categoriaId)?.nome : undefined;
 }

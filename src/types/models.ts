@@ -119,22 +119,6 @@ export type SaldoInicial = {
   criadoEm: string;
 };
 
-// Decisão do usuário sobre acompanhar (ou não) uma reserva de emergência —
-// também insert-only, mesma ideia de SaldoInicial: cada linha é "nessa data,
-// o usuário decidiu isso", e a mais recente é a que vale. Isso é o que
-// permite registrar tanto "ativou com esse valor-alvo" quanto "recusou por
-// enquanto" sem precisar de uma coluna extra pra "está mesmo ativo?" — é só
-// olhar a decisão mais recente.
-export type MetaReserva = {
-  id: string;
-  // true = usuário quer acompanhar; false = recusou (por enquanto).
-  ativa: boolean;
-  // Só faz sentido quando ativa é true. Guardado em `null` quando ativa é
-  // false, porque nesse caso não existe "valor-alvo" nenhum.
-  valorAlvo: number | null;
-  criadoEm: string;
-};
-
 // Insert-only, mesma ideia de SaldoInicial: cada linha é "o usuário
 // desbloqueou essa conquista nesse momento" (ver logic/conquistas.ts pro
 // catálogo de conquistas e a lógica que decide quais já foram alcançadas).

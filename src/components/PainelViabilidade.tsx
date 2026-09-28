@@ -67,7 +67,6 @@ export function PainelViabilidade({
         ? Haptics.NotificationFeedbackType.Success
         : Haptics.NotificationFeedbackType.Warning,
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resultado.viavel]);
 
   // Referência ABSOLUTA pra colorir a tabela — precisa ser o MESMO número
