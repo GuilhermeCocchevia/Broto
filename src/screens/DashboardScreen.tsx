@@ -13,14 +13,9 @@ import { useCategoriasStore } from '../store/useCategoriasStore';
 import { useTransacoesStore } from '../store/useTransacoesStore';
 import { useSaldoInicialStore } from '../store/useSaldoInicialStore';
 import { useSimulacoesStore } from '../store/useSimulacoesStore';
-import { obterSaldoAtual, calcularRendaFixaMedia, calcularRendaEsperadaDoMes } from '../logic/projecao';
-import { calcularParcelasAtivasNoMes } from '../logic/sobraMensal';
-import {
-  calcularDespesasTotaisDoMes,
-  temMetaDeEconomiaAtiva,
-  avaliarOrcamento,
-  calcularPreenchimentoOrcamento,
-} from '../logic/orcamentoMensal';
+import { obterSaldoAtual, calcularRendaFixaMedia } from '../logic/projecao';
+import { estimarGastosFuturos } from '../logic/estimativaDeGastos';
+import { projetarSituacaoAtual, avaliarSituacaoAtual } from '../logic/orcamentoMensal';
 import { formatarReal } from '../utils/formatarReal';
 import { interpolarCor } from '../utils/corPorValor';
 import { IconeBroto } from '../components/IconeBroto';
@@ -28,7 +23,7 @@ import { useConfiguracoesStore } from '../store/useConfiguracoesStore';
 import { curiosidadesInvestimento } from '../data/curiosidadesInvestimento';
 import { escolherProximaCuriosidade } from '../logic/curiosidades';
 import type { RootStackParamList } from '../navigation/RootNavigator';
-import { mesAtualLocal } from '../utils/dataLocal';
+import { mesAtualLocal, hojeLocal } from '../utils/dataLocal';
 import { DECORATIVO } from '../utils/acessibilidade';
 
 // Paleta só desta tela — mais "aterrada" que as cores vivas do resto do
@@ -136,42 +131,32 @@ export default function DashboardScreen() {
     [saldosIniciais, transacoes],
   );
 
-  // Barra de orçamento do mês: "quanto ainda dá pra gastar sem
-  // comprometer a meta de economia?" — pedido explícito do usuário, como
-  // alternativa mais tranquila a simplesmente avisar "você está no
-  // vermelho". Só existe (ver JSX) quando há uma meta de economia ativa
-  // esse mês; sem ela, a tela convida a criar uma em vez de mostrar
-  // qualquer número. Ver comentário completo do porquê da conta em
+  // "Situação atual": como está o dinheiro de verdade, olhando pra frente
+  // — sempre visível (não só quando existe uma meta de economia; metas e
+  // parcelas ativas continuam entrando na conta, só deixaram de ser o
+  // gatilho que decide SE o card aparece). Projeta o saldo ACUMULADO a
+  // partir de hoje (mesmo motor do Simulador) e julga pelo PIOR PONTO da
+  // trajetória — não por uma soma de renda/despesa "por mês", que escondia
+  // que um salário do fim do mês é o dinheiro que paga as contas do mês
+  // seguinte, não uma sobra livre. Ver o comentário completo em
   // logic/orcamentoMensal.ts.
-  const orcamento = useMemo(() => {
-    const mesAtual = mesAtualLocal();
+  const situacaoAtual = useMemo(() => {
+    const hoje = hojeLocal();
     const rendaFixaMensal = calcularRendaFixaMedia(transacoes);
-    // Mesmo truque já usado em SimuladorScreen.tsx pra pegar a renda
-    // esperada do mês atual: reaproveita calcularSaldoProjetado (sem
-    // nenhuma simulação) só pelas `entradas` do primeiro mês — já resolve
-    // sozinho o "só soma a média se ainda não tiver receita avulsa
-    // registrada esse mês" (ver o comentário na própria função).
-    const rendaDoMes = calcularRendaEsperadaDoMes(transacoes, mesAtual, rendaFixaMensal);
-    const despesasDoMes = calcularDespesasTotaisDoMes(transacoes, mesAtual);
-    // O "limite" a proteger não é só a meta de economia — uma compra
-    // parcelada ativa é igual de real. calcularParcelasAtivasNoMes soma
-    // TODAS as simulações ativas esse mês (ver comentário no topo de
-    // orcamentoMensal.ts).
-    const limiteDoMes = calcularParcelasAtivasNoMes(simulacoes, mesAtual);
-    return {
-      temMeta: temMetaDeEconomiaAtiva(simulacoes, mesAtual),
-      rendaDoMes,
-      despesasDoMes,
-      limiteDoMes,
-      // A conclusão (cabe? quanto falta?) mora em avaliarOrcamento — a tela
-      // só desenha o que ela devolve, sem refazer a conta.
-      situacao: avaliarOrcamento(rendaDoMes, despesasDoMes, limiteDoMes),
-      // A barra mede os gastos contra o TETO que a meta permite (renda menos
-      // o que metas/parcelas ativas pedem) — cheia = chegou no teto. Ver
-      // calcularPreenchimentoOrcamento.
-      ...calcularPreenchimentoOrcamento(rendaDoMes, despesasDoMes, limiteDoMes),
-    };
-  }, [transacoes, simulacoes]);
+    const estimativa = estimarGastosFuturos(transacoes, mesAtualLocal());
+    const projecao = projetarSituacaoAtual(
+      transacoes,
+      simulacoes,
+      saldoAtual,
+      hoje,
+      estimativa,
+      rendaFixaMensal,
+    );
+    // A conclusão (tranquilo? apertado? negativo em qual dia?) mora em
+    // avaliarSituacaoAtual — a tela só desenha o que ela devolve, sem
+    // refazer a conta.
+    return avaliarSituacaoAtual(projecao);
+  }, [transacoes, simulacoes, saldoAtual]);
 
   return (
     // Sem "céu"/"chão" ilustrados nem mascote animado (ver comentário no
@@ -326,91 +311,56 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* Barra de orçamento do mês — "quanto ainda dá pra gastar sem
-            comprometer minhas metas e parcelas ativas?", em vez de
-            simplesmente avisar "você está no vermelho" (pedido explícito
-            do usuário, mesma cautela de nunca alarmar já usada na reserva
-            de emergência). A meta de economia é o GATILHO: só existe DE
-            VERDADE quando há uma ativa (ver orcamento.temMeta) — sem ela,
-            convida a criar uma no Simulador, o que de quebra dá um motivo
-            a mais pra usar aquela opção. Mas o LIMITE comparado, uma vez
-            visível, soma toda simulação ativa (compra parcelada
-            inclusive, ver orcamento.limiteDoMes) — não só a meta. */}
-        {orcamento.temMeta ? (
-          <View style={styles.painelMoldura}>
-            <View style={styles.painelBase}>
-              <View style={styles.painelFace}>
-                <View style={styles.painelBrilho} pointerEvents="none" />
-                <Text accessibilityRole="header" style={styles.orcamentoRotulo}>ORÇAMENTO DO MÊS</Text>
+        {/* "Situação atual" — SEMPRE visível (não mais gated por ter uma
+            meta de economia ativa; metas/parcelas continuam entrando na
+            conta, só deixaram de decidir SE o card aparece — pedido
+            explícito do usuário). Projeta o saldo ACUMULADO a partir de
+            hoje e julga pelo PIOR PONTO da trajetória, não por uma soma
+            solta de renda/despesa — é o conserto de um bug relatado: um
+            salário do fim do mês (dia 30) é o dinheiro que paga as contas
+            do mês SEGUINTE, e uma conta "por mês" tratava ele como sobra
+            livre. Ver o comentário completo em logic/orcamentoMensal.ts. */}
+        <View style={styles.painelMoldura}>
+          <View style={styles.painelBase}>
+            <View style={styles.painelFace}>
+              <View style={styles.painelBrilho} pointerEvents="none" />
+              <Text accessibilityRole="header" style={styles.orcamentoRotulo}>SITUAÇÃO ATUAL</Text>
+              <View
+                style={styles.orcamentoTrilho}
+                accessible
+                accessibilityRole="progressbar"
+                accessibilityLabel="Quanto do seu dinheiro disponível já está comprometido até o pior momento previsto"
+                accessibilityValue={{ min: 0, max: 100, now: Math.round(situacaoAtual.percentual * 100) }}
+              >
                 <View
-                  style={styles.orcamentoTrilho}
-                  accessible
-                  accessibilityRole="progressbar"
-                  accessibilityLabel="Gastos do mês em relação ao teto que sua meta permite"
-                  accessibilityValue={{ min: 0, max: 100, now: Math.round(orcamento.percentual * 100) }}
+                  style={[
+                    styles.orcamentoPreenchimento,
+                    { width: `${Math.round(situacaoAtual.percentual * 100)}%` },
+                  ]}
                 >
-                  <View
-                    style={[
-                      styles.orcamentoPreenchimento,
-                      { width: `${Math.round(orcamento.percentual * 100)}%` },
-                    ]}
-                  >
-                    <View style={styles.orcamentoPreenchimentoBrilho} pointerEvents="none" />
-                  </View>
+                  <View style={styles.orcamentoPreenchimentoBrilho} pointerEvents="none" />
                 </View>
-                {/* Sem receita lançada não há número real pra mostrar (a
-                    mensagem abaixo já explica) — nada de "R$0 de R$0". */}
-                {orcamento.situacao.nivel !== 'sem-dados' && (
-                  <Text style={styles.orcamentoLegenda}>
-                    {orcamento.teto > 0
-                      ? `${formatarReal(orcamento.despesasDoMes)} gastos de ${formatarReal(orcamento.teto)} de teto`
-                      : `${formatarReal(orcamento.despesasDoMes)} gastos · ${formatarReal(orcamento.rendaDoMes)} recebidos`}
-                  </Text>
-                )}
-                <Text style={styles.orcamentoMensagem}>{orcamento.situacao.mensagem}</Text>
-                {orcamento.situacao.nivel === 'nao-cabe' && (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Rever gastos"
-                    style={styles.orcamentoConviteBotaoMoldura}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      navigation.navigate('RevisarGastos', { reducaoNecessaria: orcamento.situacao.falta });
-                    }}
-                  >
-                    {({ pressed }) => (
-                      <View
-                        style={[
-                          styles.orcamentoConviteBotaoFace,
-                          { paddingBottom: pressed ? 0 : ALTURA_BASE_PEQUENA },
-                        ]}
-                      >
-                        <View style={styles.orcamentoConviteBotaoBrilho} pointerEvents="none" />
-                        <Text style={styles.orcamentoConviteBotaoTexto}>Rever gastos</Text>
-                      </View>
-                    )}
-                  </Pressable>
-                )}
               </View>
-            </View>
-          </View>
-        ) : (
-          <View style={styles.painelMoldura}>
-            <View style={styles.painelBase}>
-              <View style={styles.painelFace}>
-                <View style={styles.painelBrilho} pointerEvents="none" />
-                <Text accessibilityRole="header" style={styles.orcamentoRotulo}>ORÇAMENTO DO MÊS</Text>
-                <Text style={styles.orcamentoConviteTexto}>
-                  Crie uma meta de economia no Simulador pra acompanhar aqui quanto ainda dá pra gastar sem
-                  comprometer ela.
-                </Text>
+              {/* Sem legenda de "X gastos de Y disponíveis" de propósito: a
+                  janela de 12 meses (ver logic/orcamentoMensal.ts) faz
+                  esses totais somarem dezenas de milhares de reais — um
+                  número gigante, sem uso prático, e que contradiz
+                  visualmente o "Valor Disponível" (o saldo de HOJE) logo
+                  acima. A barra continua só como proporção visual; o único
+                  número que importa é o que a mensagem abaixo já dá,
+                  sempre pequeno e amarrado a um mês real específico. */}
+              <Text style={styles.orcamentoMensagem}>{situacaoAtual.mensagem}</Text>
+              {situacaoAtual.nivel === 'negativo' && (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Criar meta de economia"
+                  accessibilityLabel="Rever gastos"
                   style={styles.orcamentoConviteBotaoMoldura}
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    navigation.navigate('NovaSimulacao', { tipoSugerido: 'economia' });
+                    navigation.navigate('RevisarGastos', {
+                      reducaoNecessaria: situacaoAtual.falta,
+                      mes: situacaoAtual.piorData.slice(0, 7),
+                    });
                   }}
                 >
                   {({ pressed }) => (
@@ -421,14 +371,14 @@ export default function DashboardScreen() {
                       ]}
                     >
                       <View style={styles.orcamentoConviteBotaoBrilho} pointerEvents="none" />
-                      <Text style={styles.orcamentoConviteBotaoTexto}>Criar meta de economia</Text>
+                      <Text style={styles.orcamentoConviteBotaoTexto}>Rever gastos</Text>
                     </View>
                   )}
                 </Pressable>
-              </View>
+              )}
             </View>
           </View>
-        )}
+        </View>
 
         {/* Curiosidade educativa, sorteada uma vez por abertura do app (ver
             useEffect acima) — preenche com conteúdo de verdade o espaço que
@@ -836,25 +786,16 @@ const styles = StyleSheet.create({
     height: 4,
     backgroundColor: 'rgba(255, 255, 255, 0.45)',
   },
-  orcamentoLegenda: {
-    fontSize: 12,
-    color: colors.textMuted,
-  },
-  // Mensagem discreta (ver avaliarOrcamento) — mesmo tratamento sério e
+  // Mensagem discreta (ver avaliarSituacaoAtual) — mesmo tratamento sério e
   // legível do texto da curiosidade, nunca em tom de alarme.
   orcamentoMensagem: {
     fontSize: 13,
     lineHeight: 18,
     color: colors.text,
   },
-  orcamentoConviteTexto: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: colors.text,
-  },
   // Botão pequeno "de jogo" (mesma técnica de moldura+face+brilho dos
   // botões do menu, só que num tamanho pill, alinhado à esquerda) — o
-  // convite pra criar a meta precisa parecer tão clicável quanto os
+  // convite pra rever gastos precisa parecer tão clicável quanto os
   // outros botões da tela, não um link de texto perdido.
   orcamentoConviteBotaoMoldura: {
     alignSelf: 'flex-start',

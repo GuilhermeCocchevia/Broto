@@ -24,9 +24,12 @@ export type RootStackParamList = {
   Simulador: undefined;
   Categorias: undefined;
   Extrato: undefined;
-  // `reducaoNecessaria`: quanto cortar por mês, mostrado no topo da lista quando
-  // o usuário chega pelo botão "rever gastos" (ver BotaoRevisarGastos).
-  RevisarGastos: { reducaoNecessaria?: number } | undefined;
+  // `reducaoNecessaria`: quanto cortar, mostrado no topo da lista quando o
+  // usuário chega pelo botão "rever gastos" (ver BotaoRevisarGastos). `mes`
+  // ('AAAA-MM'): qual mês listar — ausente = mês atual (ver
+  // RevisarGastosScreen.tsx); o card "Situação atual" do Dashboard passa o
+  // mês do PIOR ponto da projeção, não necessariamente o corrente.
+  RevisarGastos: { reducaoNecessaria?: number; mes?: string } | undefined;
   Resumo: undefined;
   Backup: undefined;
   Configuracoes: undefined;

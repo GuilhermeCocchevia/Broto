@@ -17,6 +17,24 @@ export function converterDateParaIso(data: Date): string {
   return `${ano}-${mes}-${dia}`;
 }
 
+// Soma (ou subtrai, com número negativo) dias a uma data 'AAAA-MM-DD'.
+// `Date.setDate` já lida sozinho com virada de mês/ano (dia 32 de outubro
+// vira 1º de novembro), por isso passa pelo objeto Date em vez de fazer
+// aritmética manual na string.
+export function adicionarDias(iso: string, quantidadeDias: number): string {
+  const data = converterIsoParaDate(iso);
+  data.setDate(data.getDate() + quantidadeDias);
+  return converterDateParaIso(data);
+}
+
+// Quantos dias existem de `dataInicio` até `dataFim` (positivo se `dataFim`
+// for depois). `Math.round` (não truncar) absorve qualquer resto de menos
+// de um dia que a aritmética de Date por hora local possa deixar passar.
+export function diferencaEmDias(dataFim: string, dataInicio: string): number {
+  const MS_POR_DIA = 24 * 60 * 60 * 1000;
+  return Math.round((converterIsoParaDate(dataFim).getTime() - converterIsoParaDate(dataInicio).getTime()) / MS_POR_DIA);
+}
+
 export function formatarDataBr(iso: string): string {
   const [ano, mes, dia] = iso.split('-');
   return `${dia}/${mes}/${ano}`;

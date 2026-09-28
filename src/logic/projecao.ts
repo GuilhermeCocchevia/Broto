@@ -7,6 +7,7 @@ import type { Transacao, Simulacao, SaldoInicial } from '../types/models';
 import type { EstimativaDeGastos } from './estimativaDeGastos';
 import { normalizarTexto } from '../utils/normalizarTexto';
 import { dataLocalDeTimestamp, hojeLocal } from '../utils/dataLocal';
+import { adicionarDias, diferencaEmDias } from '../utils/formatarDataBr';
 
 export type MesProjetado = {
   // Formato 'AAAA-MM', ex: '2026-09'.
@@ -436,6 +437,246 @@ export function simulacaoAtivaNoMes(simulacao: Simulacao, mes: string): boolean 
   return numeroDaParcelaNesseMes >= 0 && numeroDaParcelaNesseMes < simulacao.parcelas;
 }
 
+// Um lançamento de caixa numa data EXATA — receita ou parcela de
+// simulação com sinal já aplicado (positivo entra, negativo sai). Existe
+// pra responder uma pergunta que "por mês" não consegue: dentro do MESMO
+// mês, o que vence ANTES do que entra? Um salário do dia 30 não cobre uma
+// conta que já venceu dia 10 — mesmo os dois "aplicando" no mesmo
+// mês-calendário, uma conta por mês (calcularSaldoProjetado) só vê o
+// saldo do mês FECHADO, nunca o vale no meio dele. Bug real relatado
+// (2026-09-27): o card "Situação atual" dizia saldo positivo o mês
+// inteiro, mas o saldo de verdade, dia a dia, ficava negativo por quase 3
+// semanas entre duas contas e o próximo salário.
+export type EventoDeCaixa = {
+  data: string;
+  valor: number;
+};
+
+// As ocorrências de UMA transação recorrente dentro de
+// (dataInicioExclusive, dataFimInclusive] — mesma regra de recorrência de
+// transacaoSeAplicaNoMes/contarOcorrenciasRecorrentes (clamp no último dia
+// do mês pra 'mensal', mesmo mês/dia todo ano pra 'anual'), mas devolvendo
+// a DATA exata de cada ocorrência em vez de só contar quantas existem.
+function listarOcorrenciasDaTransacao(
+  transacao: Transacao,
+  dataInicioExclusive: string,
+  dataFimInclusive: string,
+): EventoDeCaixa[] {
+  const sinal = transacao.tipo === 'receita' ? 1 : -1;
+
+  if (transacao.frequencia === 'unica') {
+    if (transacao.data > dataInicioExclusive && transacao.data <= dataFimInclusive) {
+      return [{ data: transacao.data, valor: sinal * transacao.valor }];
+    }
+    return [];
+  }
+
+  const diaDoMes = Number(transacao.data.slice(8, 10));
+  const passoEmMeses = transacao.frequencia === 'anual' ? 12 : 1;
+  const mesDoFim = transacao.dataFim === null ? null : formatarMes(transacao.dataFim);
+  const mesLimite =
+    mesDoFim !== null && mesDoFim < formatarMes(dataFimInclusive) ? mesDoFim : formatarMes(dataFimInclusive);
+
+  const eventos: EventoDeCaixa[] = [];
+  let mes = formatarMes(transacao.data);
+  while (mes <= mesLimite) {
+    const dataDaOcorrencia = dataDoDiaNoMes(mes, diaDoMes);
+    if (dataDaOcorrencia > dataInicioExclusive && dataDaOcorrencia <= dataFimInclusive) {
+      eventos.push({ data: dataDaOcorrencia, valor: sinal * transacao.valor });
+    }
+    mes = adicionarMeses(mes, passoEmMeses);
+  }
+  return eventos;
+}
+
+// Mesma ideia, pra cada parcela de uma simulação — no mesmo dia do mês de
+// `dataInicio` (uma compra parcelada no cartão cobra sempre no mesmo dia).
+function listarOcorrenciasDaSimulacao(
+  simulacao: Simulacao,
+  dataInicioExclusive: string,
+  dataFimInclusive: string,
+): EventoDeCaixa[] {
+  const diaDoMes = Number(simulacao.dataInicio.slice(8, 10));
+  const eventos: EventoDeCaixa[] = [];
+  let mes = formatarMes(simulacao.dataInicio);
+  for (let indice = 0; indice < simulacao.parcelas; indice++) {
+    const dataDaOcorrencia = dataDoDiaNoMes(mes, diaDoMes);
+    if (dataDaOcorrencia > dataInicioExclusive && dataDaOcorrencia <= dataFimInclusive) {
+      const parcela = calcularParcelaEfetiva(simulacao);
+      const aporte = indice === 0 ? simulacao.aporteInicial : 0;
+      eventos.push({ data: dataDaOcorrencia, valor: -(parcela + aporte) });
+    }
+    mes = adicionarMeses(mes, 1);
+  }
+  return eventos;
+}
+
+// O saldo, dia a dia de VERDADE, a partir de hoje — não mais "por mês
+// fechado". Cada ponto devolvido é o saldo IMEDIATAMENTE DEPOIS de um
+// lançamento acontecer (não um ponto por dia do calendário — entre
+// lançamentos o saldo não muda, então não há por que marcar esses dias).
+// O primeiro ponto é sempre hoje, com o saldo de partida, mesmo sem
+// nenhum lançamento futuro ainda.
+export type PontoDeCaixa = {
+  data: string;
+  // O delta desse ponto (0 no primeiro ponto, que é só "hoje", o saldo de
+  // partida) — permite separar entradas de saídas depois, sem precisar
+  // guardar a lista de eventos à parte.
+  valor: number;
+  saldo: number;
+};
+
+export function projetarFluxoDeCaixaDiario(
+  transacoes: Transacao[],
+  simulacoes: Simulacao[],
+  saldoAtual: number,
+  hoje: string,
+  quantidadeDias: number,
+  estimativa: EstimativaDeGastos,
+  // Estimativa de renda (ver calcularRendaFixaMedia) pra quem lança salário
+  // como receita AVULSA a cada mês (não recorrente 'mensal') — sem isso, um
+  // mês futuro sem nenhuma receita avulsa PRÓPRIA já lançada pareceria não
+  // ter renda nenhuma, mesmo a pessoa recebendo salário todo mês na vida
+  // real. Default 0: quem já lança salário como 'mensal' recorrente não
+  // precisa dessa estimativa (a receita real já cobre todo mês sozinha).
+  rendaFixaMensal: number = 0,
+): PontoDeCaixa[] {
+  const fim = adicionarDias(hoje, quantidadeDias);
+
+  const eventos: EventoDeCaixa[] = [];
+  for (const transacao of transacoes) {
+    eventos.push(...listarOcorrenciasDaTransacao(transacao, hoje, fim));
+  }
+  for (const simulacao of simulacoes) {
+    eventos.push(...listarOcorrenciasDaSimulacao(simulacao, hoje, fim));
+  }
+
+  // Gasto do dia a dia estimado (ver EstimativaDeGastos): não é um
+  // lançamento real com data própria, é uma média — entra como UM evento
+  // por mês, no dia 15 (meio do mês). Nada de extremo de propósito: gasto
+  // variável de verdade (mercado, lazer, imprevistos) se espalha ao longo
+  // do mês, não cai tudo de uma vez — colocar a estimativa inteira no dia
+  // 1 (testado e descartado: ver histórico do commit) criava um mergulho
+  // artificial que não existe na vida real, fazendo simulações parecerem
+  // mais arriscadas do que são de verdade; colocar no fim do mês (dia 28)
+  // seria otimista demais na outra direção. Meio do mês é a aproximação
+  // mais honesta pra um valor que já é, em si, só uma média. Só nos meses
+  // SEGUINTES ao atual: o mês atual já está representado pelas transações
+  // REAIS já lançadas nele (algumas ainda por vir, já listadas acima) —
+  // somar a estimativa por cima de novo devolveria o real e o estimado ao
+  // mesmo tempo.
+  const gastoRecorrenteEstimado =
+    estimativa.gastoVariavelMensal +
+    estimativa.recorrentesNaPratica.reduce((soma, r) => soma + r.valorMensal, 0);
+  if (gastoRecorrenteEstimado > 0) {
+    let mes = adicionarMeses(estimativa.mesAtual, 1);
+    while (mes <= formatarMes(fim)) {
+      const dataDoEvento = dataDoDiaNoMes(mes, 15);
+      if (dataDoEvento > hoje && dataDoEvento <= fim) {
+        eventos.push({ data: dataDoEvento, valor: -gastoRecorrenteEstimado });
+      }
+      mes = adicionarMeses(mes, 1);
+    }
+  }
+
+  // Renda fixa estimada (ver comentário no parâmetro): um evento por mês
+  // SEM nenhuma receita avulsa própria já lançada nele, sempre no dia 28
+  // (o mais TARDE possível dentro de qualquer mês, incluindo fevereiro) —
+  // o oposto da conservadorismo acima: pra renda, assumir que ela chega
+  // tarde (não cedo) é que nunca faz o saldo mínimo parecer melhor do que
+  // é, porque uma despesa do início do mês não "espera" a renda estimada
+  // do fim dele pra ser paga.
+  if (rendaFixaMensal > 0) {
+    let mes = formatarMes(hoje);
+    while (mes <= formatarMes(fim)) {
+      const temReceitaAvulsaPropria = transacoes.some(
+        (t) => t.tipo === 'receita' && t.frequencia === 'unica' && formatarMes(t.data) === mes,
+      );
+      if (!temReceitaAvulsaPropria) {
+        const dataDoEvento = dataDoDiaNoMes(mes, 28);
+        if (dataDoEvento > hoje && dataDoEvento <= fim) {
+          eventos.push({ data: dataDoEvento, valor: rendaFixaMensal });
+        }
+      }
+      mes = adicionarMeses(mes, 1);
+    }
+  }
+
+  eventos.sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : 0));
+
+  let saldo = saldoAtual;
+  const pontos: PontoDeCaixa[] = [{ data: hoje, valor: 0, saldo }];
+  for (const evento of eventos) {
+    saldo += evento.valor;
+    pontos.push({ data: evento.data, valor: evento.valor, saldo });
+  }
+  return pontos;
+}
+
+// Agrupa o fluxo de caixa DIÁRIO (ver projetarFluxoDeCaixaDiario) num
+// array de "um item por mês" no mesmo formato de calcularSaldoProjetado
+// (MesProjetado: entradas/saídas somadas, saldo do mês) — só que o
+// `saldo` de cada mês aqui é o MENOR saldo alcançado durante aquele mês
+// (dia a dia), não o saldo no FIM do mês. Existe pra alimentar
+// avaliarViabilidadeConjunta com o mesmo formato que a tabela/gráfico do
+// Simulador já esperam (nenhuma tela precisou mudar), mas corrigindo o
+// mesmo bug já corrigido no card "Situação atual" do Dashboard: um mês
+// pode "fechar" positivo escondendo que, no MEIO dele, uma despesa venceu
+// antes do próximo salário chegar. Bug real reportado (2026-09-27): o
+// Simulador dizia "outubro: saldo R$1.928,10" (fim do mês) quando o saldo
+// de verdade, dia a dia, tinha chegado a ficar negativo dentro do mesmo
+// outubro.
+export function agruparFluxoDiarioPorMes(
+  pontos: PontoDeCaixa[],
+  mesInicial: string,
+  quantidadeMeses: number,
+): MesProjetado[] {
+  const resultado: MesProjetado[] = [];
+  let indice = 0;
+  // O saldo "herdado" de antes do mês corrente — se nenhum lançamento
+  // acontecer nesse mês, o saldo mínimo dele é simplesmente esse valor
+  // (o saldo não muda sozinho).
+  let saldoHerdado = pontos[0]?.saldo ?? 0;
+
+  // `pontos` pode começar ANTES de `mesInicial` (ex: o ponto "hoje" da
+  // véspera de um mês futuro, ver avaliarViabilidadeConjunta) — avança por
+  // cima desses pontos "de antes", atualizando `saldoHerdado`, sem tentar
+  // casar `mes` contra eles (senão `indice` nunca avançaria: o while
+  // abaixo só consome pontos cujo mês bate exatamente com o mês da vez).
+  while (indice < pontos.length && formatarMes(pontos[indice].data) < mesInicial) {
+    saldoHerdado = pontos[indice].saldo;
+    indice++;
+  }
+
+  let mes = mesInicial;
+
+  for (let i = 0; i < quantidadeMeses; i++) {
+    let entradas = 0;
+    let saidas = 0;
+    // `null` até o primeiro lançamento de verdade DENTRO do mês — o saldo
+    // com que o mês COMEÇA (herdado do mês anterior) não conta como "o
+    // mínimo desse mês": ele não aconteceu por causa de nada desse mês,
+    // só estava ali quando o mês começou. Só vira candidato de verdade se
+    // o mês não tiver nenhum lançamento próprio (aí sim o saldo fica
+    // parado nesse valor o mês inteiro, ver fallback abaixo).
+    let saldoMinimoDoMes: number | null = null;
+
+    while (indice < pontos.length && formatarMes(pontos[indice].data) === mes) {
+      const ponto = pontos[indice];
+      if (ponto.valor > 0) entradas += ponto.valor;
+      else if (ponto.valor < 0) saidas += -ponto.valor;
+      saldoHerdado = ponto.saldo;
+      if (saldoMinimoDoMes === null || saldoHerdado < saldoMinimoDoMes) saldoMinimoDoMes = saldoHerdado;
+      indice++;
+    }
+
+    resultado.push({ mes, entradas, saidas, saldo: saldoMinimoDoMes ?? saldoHerdado });
+    mes = adicionarMeses(mes, 1);
+  }
+
+  return resultado;
+}
+
 export function calcularSaldoProjetado(
   transacoes: Transacao[],
   simulacoes: Simulacao[],
@@ -609,7 +850,15 @@ export function calcularReducaoMensalNecessaria(meses: MesProjetado[]): number {
     if (mes.saldo >= 0) return;
     reducao = Math.max(reducao, -mes.saldo / (indice + 1));
   });
-  return Math.ceil(reducao * 100) / 100;
+  // Mata ruído de ponto flutuante bem abaixo do centavo (6 casas — nunca
+  // afeta um valor real, só o resto de somar muitos números decimais em
+  // sequência) ANTES do `Math.ceil` pra cima: o motor dia a dia (ver
+  // projetarFluxoDeCaixaDiario) soma muito mais eventos que o antigo motor
+  // por mês, e um resto tipo -123,40000000000001 empurrava o `Math.ceil`
+  // pro centavo seguinte à toa (sugeria R$123,41 quando o valor de
+  // verdade era exatamente R$123,40).
+  const semRuido = Math.round(reducao * 1e6) / 1e6;
+  return Math.ceil(semRuido * 100) / 100;
 }
 
 // A pergunta que o Simulador existe pra responder: "dá pra fazer essa
@@ -649,12 +898,36 @@ export function avaliarViabilidadeSimulacao(
 // `dataInicio` for uma data passada, a conta usa `saldoAtual` (o saldo de
 // HOJE) como base pra um mês que já passou — caso raro, não vale a
 // complexidade de buscar saldo histórico agora.
+// Estimativa "vazia" (sem gasto do dia a dia adicional) usada quando quem
+// chama não tem uma EstimativaDeGastos de verdade (ver estimarGastosFuturos)
+// — mesmo espírito calmo de "não inventar número" do resto do app: sem
+// dado nenhum sobre o padrão de gasto avulso, a projeção assume só o que
+// está realmente lançado, nada a mais.
+function estimativaVazia(mesAtual: string): EstimativaDeGastos {
+  return {
+    mesAtual,
+    gastoVariavelMensal: 0,
+    gastoVariavelPorCategoria: [],
+    recorrentesNaPratica: [],
+    mesesComDado: 0,
+    confianca: 'sem-dados',
+  };
+}
+
 export function avaliarViabilidadeConjunta(
   simulacoes: Simulacao[],
   transacoes: Transacao[],
   saldoAtual: number,
   rendaFixaMensal: number,
   estimativa?: EstimativaDeGastos,
+  // Ponto de partida de VERDADE da projeção dia a dia (ver
+  // projetarFluxoDeCaixaDiario) — default hojeLocal() pra quem chama sem
+  // passar (a imensa maioria das chamadas reais). Limitação assumida
+  // (igual antes, ver comentário acima): se alguma `dataInicio` for uma
+  // data passada, a conta ainda usa `saldoAtual` (o saldo de HOJE) como se
+  // fosse o saldo daquele mês passado — caso raro, não vale a
+  // complexidade de buscar saldo histórico agora.
+  hoje: string = hojeLocal(),
 ): ResultadoViabilidade {
   // Sem nenhuma simulação, não tem janela nenhuma pra avaliar — devolve um
   // resultado trivialmente viável (não há função de `.reduce` que funcione
@@ -669,18 +942,29 @@ export function avaliarViabilidadeConjunta(
   const mesFinal = mesesDeFim.reduce((maior, atual) => (atual > maior ? atual : maior));
   const quantidadeMeses = diferencaEmMeses(mesFinal, mesInicial) + 1;
 
-  const meses = calcularSaldoProjetado(
+  // A projeção dia a dia sempre anda PRA FRENTE a partir de uma data
+  // (`hoje`, ver projetarFluxoDeCaixaDiario) — pra cobrir a MESMA janela
+  // mês-a-mês de antes (de `mesInicial` até o fim de `mesFinal`), o ponto
+  // de partida do dia a dia é a véspera do 1º dia de `mesInicial` (evento
+  // NO dia 1 precisa entrar, e o limite inferior é exclusivo).
+  const vesperaDoInicio = adicionarDias(dataDoDiaNoMes(mesInicial, 1), -1);
+  const ultimoDiaDaJanela = dataDoDiaNoMes(mesFinal, 31);
+  const quantidadeDias = diferencaEmDias(ultimoDiaDaJanela, vesperaDoInicio);
+
+  const pontos = projetarFluxoDeCaixaDiario(
     transacoes,
     simulacoes,
-    mesInicial,
-    quantidadeMeses,
     saldoAtual,
+    vesperaDoInicio,
+    quantidadeDias,
+    estimativa ?? estimativaVazia(formatarMes(hoje)),
     rendaFixaMensal,
-    estimativa,
   );
+  const meses = agruparFluxoDiarioPorMes(pontos, mesInicial, quantidadeMeses);
 
   // Sempre existe um "pior mês" (mesmo que a janela seja de 1 mês só) — o
-  // menor saldo acumulado durante toda a janela combinada.
+  // menor saldo (dia a dia, ver agruparFluxoDiarioPorMes) durante toda a
+  // janela combinada.
   const piorMesProjetado = meses.reduce(
     (pior, atual) => (atual.saldo < pior.saldo ? atual : pior),
     meses[0],

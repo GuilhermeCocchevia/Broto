@@ -16,7 +16,7 @@ import {
   totalDaCategoriaNoDiaADia,
   type Avaliador,
 } from './cenariosDeProjecao';
-import { avaliarViabilidadeSimulacao } from './projecao';
+import { avaliarViabilidadeSimulacao, type ResultadoViabilidade } from './projecao';
 import { formatarMesBr } from '../utils/formatarDataBr';
 import { estimarGastosFuturos, type EstimativaDeGastos } from './estimativaDeGastos';
 import type { Simulacao, Transacao } from '../types/models';
@@ -56,11 +56,32 @@ const meta: Simulacao = {
   criadoEm: '',
 };
 const estimativaReal = estimarGastosFuturos(transacoesReais, MES_ATUAL);
+
+// Arredonda os saldos pra 6 casas decimais antes de comparar dois
+// resultados que deveriam ser numericamente iguais — o motor dia a dia
+// (ver projecao.ts) soma muito mais eventos que o antigo motor por mês (um
+// por lançamento, não um por mês), e ponto flutuante não é associativo:
+// `(x*0.9)*k` e `x*(0.9*k)` dão o mesmo número real, mas o último bit pode
+// divergir. Nenhuma das duas contas está errada — é ruído bem abaixo do
+// centavo, não uma diferença de verdade.
+function arredondar(r: ResultadoViabilidade): ResultadoViabilidade {
+  return {
+    ...r,
+    piorSaldo: Math.round(r.piorSaldo * 1e6) / 1e6,
+    meses: r.meses.map((m) => ({ ...m, saldo: Math.round(m.saldo * 1e6) / 1e6 })),
+  };
+}
+
 function criarAvaliador(transacoes: Transacao[], simulacao: Simulacao): Avaliador {
   return (estimativa) => avaliarViabilidadeSimulacao(simulacao, transacoes, 0, 0, estimativa);
 }
-// A mesma meta começando no mês que vem (o cenário em que cortar gasto funciona).
-const metaMesQueVem: Simulacao = { ...meta, dataInicio: '2026-10-01' };
+// A mesma meta começando no mês que vem (o cenário em que cortar gasto
+// funciona) — mesmo DIA do mês que `meta` (dia 21, depois do salário e das
+// despesas do início do mês), só num mês diferente. Dia 1 criaria um
+// problema de TIMING à parte (a parcela debitando antes do salário
+// chegar, ver CASO REAL em projecao.test.ts) que não é o que estes testes
+// querem exercitar — aqui o foco é a matemática do corte necessário.
+const metaMesQueVem: Simulacao = { ...meta, dataInicio: '2026-10-21' };
 const avaliar = criarAvaliador(transacoesReais, metaMesQueVem);
 
 test('ajustarGastoDoDiaADia escala o variável E as recorrentes na prática, sem mexer no resto', () => {
@@ -146,7 +167,11 @@ test('montarAvisoDeFolga: viável no esperado mas não com 20% a mais → aviso 
     criarTransacao({ id: 'v', valor: 2000, data: '2026-09-10', descricao: 'Gastos' }),
   ];
   const estimativa = estimarGastosFuturos(t, MES_ATUAL);
-  const meta3: Simulacao = { ...meta, valorTotal: 2400, parcelas: 3, dataInicio: '2026-10-01' };
+  // Dia 21 (não dia 1): salário/fixos caem no dia 5 — começar a meta no
+  // dia 1 debitaria ANTES do salário chegar, um risco de timing à parte
+  // que não é o que este teste quer exercitar (ver CASO REAL em
+  // projecao.test.ts pro cenário em que isso é o ponto).
+  const meta3: Simulacao = { ...meta, valorTotal: 2400, parcelas: 3, dataInicio: '2026-10-21' };
   const av = criarAvaliador(t, meta3);
 
   const esperado = av(estimativa);
@@ -368,12 +393,12 @@ test('calcularCenarios: o "pesado" é sempre +20% no dia a dia INTEIRO (em cima 
   const foco = { tipo: 'categoria', categoriaId: 'lazer' } as const;
   const c = calcularCenarios(estimativaPorCategoria, avaliarPorCategoria, 10, foco);
   const esperadaEstimativa = ajustarGastoDeCategoria(estimativaPorCategoria, 'lazer', 0.9);
-  expect(c.esperado).toEqual(avaliarPorCategoria(esperadaEstimativa));
-  expect(c.pesado).toEqual(avaliarPorCategoria(ajustarGastoDoDiaADia(esperadaEstimativa, FATOR_IMPREVISTOS)));
+  expect(arredondar(c.esperado)).toEqual(arredondar(avaliarPorCategoria(esperadaEstimativa)));
+  expect(arredondar(c.pesado)).toEqual(arredondar(avaliarPorCategoria(ajustarGastoDoDiaADia(esperadaEstimativa, FATOR_IMPREVISTOS))));
 
   // Com foco geral, igual ao comportamento de antes da fase 3 fechar (fator * 1.2).
   const g = calcularCenarios(estimativaPorCategoria, avaliarPorCategoria, 10, { tipo: 'geral' });
-  expect(g.pesado).toEqual(avaliarPorCategoria(ajustarGastoDoDiaADia(estimativaPorCategoria, 0.9 * FATOR_IMPREVISTOS)));
+  expect(arredondar(g.pesado)).toEqual(arredondar(avaliarPorCategoria(ajustarGastoDoDiaADia(estimativaPorCategoria, 0.9 * FATOR_IMPREVISTOS))));
 });
 
 test('categoria pequena demais pra resolver sozinha: não culpa as despesas fixas — diz que é só uma parte do dia a dia', () => {

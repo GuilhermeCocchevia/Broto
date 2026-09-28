@@ -5,7 +5,21 @@ import {
   formatarMesBr,
   formatarDataPorExtenso,
   formatarMesPorExtenso,
+  adicionarDias,
 } from './formatarDataBr';
+
+test('adicionarDias soma dias simples dentro do mesmo mês', () => {
+  expect(adicionarDias('2026-09-10', 5)).toBe('2026-09-15');
+});
+
+test('adicionarDias atravessa virada de mês e de ano', () => {
+  expect(adicionarDias('2026-09-27', 5)).toBe('2026-10-02');
+  expect(adicionarDias('2026-12-28', 5)).toBe('2027-01-02');
+});
+
+test('adicionarDias com número negativo subtrai', () => {
+  expect(adicionarDias('2026-10-02', -5)).toBe('2026-09-27');
+});
 
 test('formatarDataBr troca AAAA-MM-DD por DD/MM/AAAA', () => {
   expect(formatarDataBr('2026-09-16')).toBe('16/09/2026');

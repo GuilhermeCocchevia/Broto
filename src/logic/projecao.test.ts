@@ -19,8 +19,9 @@ import {
   calcularRendaEsperadaDoMes,
   listarOcorrenciasAnuais,
   transacaoSeAplicaNoMes,
+  projetarFluxoDeCaixaDiario,
 } from './projecao';
-import { estimarGastosFuturos } from './estimativaDeGastos';
+import { estimarGastosFuturos, type EstimativaDeGastos } from './estimativaDeGastos';
 import type { Transacao, Simulacao, SaldoInicial } from '../types/models';
 
 // Helpers só pra não repetir todo campo em toda transação/simulação de teste —
@@ -114,6 +115,136 @@ test('simulação tipo "economia" afeta a projeção exatamente como uma "compra
   // do disponível todo mês, não importa se é parcela de dívida ou
   // contribuição pra uma meta de guardar dinheiro.
   expect(resultado.map((m) => m.saidas)).toEqual([0, 100, 100, 100, 0]);
+});
+
+// Estimativa "neutra" (sem gasto do dia a dia estimado) — os testes de
+// projetarFluxoDeCaixaDiario abaixo querem controlar só os lançamentos
+// REAIS, exceto os que testam a estimativa explicitamente.
+function criarEstimativaVazia(mesAtual: string): EstimativaDeGastos {
+  return {
+    mesAtual,
+    gastoVariavelMensal: 0,
+    gastoVariavelPorCategoria: [],
+    recorrentesNaPratica: [],
+    mesesComDado: 0,
+    confianca: 'sem-dados',
+  };
+}
+
+test('projetarFluxoDeCaixaDiario: um lançamento no MEIO do mês pode deixar o saldo negativo mesmo o mês fechando positivo — bug real corrigido', () => {
+  // Cenário relatado: salário recorrente cai no dia 30 (fim do mês), mas
+  // uma conta grande vence dia 10 — ANTES do salário do mês seguinte
+  // chegar. "Por mês" (calcularSaldoProjetado) nunca veria isso, porque o
+  // mês de outubro TERMINA positivo (a conta de outubro, dia 10, e o
+  // salário que volta a entrar dia 30 do mesmo mês, se cancelam no total).
+  const transacoes = [
+    criarTransacao({ id: 'salario', tipo: 'receita', frequencia: 'mensal', valor: 4271.54, data: '2026-09-30', dataFim: null }),
+    criarTransacao({ id: 'emprestimo', frequencia: 'mensal', valor: 900, data: '2026-09-30', dataFim: null }),
+    criarTransacao({ id: 'financiamento', frequencia: 'unica', valor: 5000, data: '2026-10-10' }),
+  ];
+
+  const pontos = projetarFluxoDeCaixaDiario(transacoes, [], 0, '2026-09-27', 40, criarEstimativaVazia('2026-09'));
+  const pior = pontos.reduce((p, atual) => (atual.saldo < p.saldo ? atual : p), pontos[0]);
+
+  // 30/09: +4271.54 (salário) -900 (empréstimo) = 3371.54.
+  // 10/10: -5000 (financiamento) = -1628.46 — NEGATIVO, mesmo o mês de
+  // outubro "fechando" em 1743.08 (positivo) quando o salário volta dia 30.
+  expect(pior.data).toBe('2026-10-10');
+  expect(pior.saldo).toBeCloseTo(-1628.46, 2);
+});
+
+test('projetarFluxoDeCaixaDiario: despesa "mensal" recorre no mesmo dia do mês, com clamp no fim de fevereiro', () => {
+  const transacao = criarTransacao({ frequencia: 'mensal', valor: 100, data: '2026-01-31', dataFim: null });
+  const pontos = projetarFluxoDeCaixaDiario([transacao], [], 1000, '2026-01-01', 60, criarEstimativaVazia('2026-01'));
+  const datas = pontos.map((p) => p.data);
+  // 31/01, depois 28/02 (fevereiro de 2026 não é bissexto — clamp no
+  // último dia real do mês, mesma regra de dataDoDiaNoMes já usada em
+  // calcularSaldoProjetado).
+  expect(datas).toContain('2026-01-31');
+  expect(datas).toContain('2026-02-28');
+});
+
+test('projetarFluxoDeCaixaDiario: transação "única" só entra se a data cair dentro da janela (hoje exclusive, fim inclusive)', () => {
+  const antesDeHoje = criarTransacao({ id: 'a', frequencia: 'unica', valor: 50, data: '2026-08-31' });
+  const noDiaDeHoje = criarTransacao({ id: 'b', frequencia: 'unica', valor: 60, data: '2026-09-01' });
+  const dentro = criarTransacao({ id: 'c', frequencia: 'unica', valor: 70, data: '2026-09-15' });
+  const depoisDoFim = criarTransacao({ id: 'd', frequencia: 'unica', valor: 80, data: '2026-10-01' });
+
+  const pontos = projetarFluxoDeCaixaDiario(
+    [antesDeHoje, noDiaDeHoje, dentro, depoisDoFim],
+    [],
+    0,
+    '2026-09-01',
+    20,
+    criarEstimativaVazia('2026-09'),
+  );
+
+  // Só os pontos de EVENTO (valor !== 0) — o primeiro ponto sempre existe
+  // com a data de hoje e valor 0 (é só o saldo de partida), então checar a
+  // presença da data '2026-09-01' sozinha não provaria nada sobre a
+  // transação datada nesse mesmo dia.
+  const datasDosEventos = pontos.filter((p) => p.valor !== 0).map((p) => p.data);
+  expect(datasDosEventos).not.toContain('2026-08-31');
+  // A transação datada EXATAMENTE hoje não vira evento (hoje é o limite
+  // EXCLUSIVO — já está refletida no saldo de partida, ver obterSaldoAtual).
+  expect(datasDosEventos).not.toContain('2026-09-01');
+  expect(datasDosEventos).toContain('2026-09-15');
+  expect(datasDosEventos).not.toContain('2026-10-01');
+});
+
+test('projetarFluxoDeCaixaDiario: parcela de simulação entra no mesmo dia do mês de dataInicio, só enquanto durar', () => {
+  const simulacao = criarSimulacao({ valorTotal: 300, parcelas: 3, dataInicio: '2026-09-10' });
+  const pontos = projetarFluxoDeCaixaDiario([], [simulacao], 1000, '2026-09-01', 100, criarEstimativaVazia('2026-09'));
+  const eventosDaSimulacao = pontos.filter((p) => p.valor === -100);
+  expect(eventosDaSimulacao.map((p) => p.data)).toEqual(['2026-09-10', '2026-10-10', '2026-11-10']);
+});
+
+test('projetarFluxoDeCaixaDiario: gasto do dia a dia estimado entra no dia 15 dos meses SEGUINTES, nunca no mês atual', () => {
+  const estimativa: EstimativaDeGastos = {
+    mesAtual: '2026-09',
+    gastoVariavelMensal: 500,
+    gastoVariavelPorCategoria: [],
+    recorrentesNaPratica: [],
+    mesesComDado: 3,
+    confianca: 'boa',
+  };
+  const pontos = projetarFluxoDeCaixaDiario([], [], 0, '2026-09-01', 50, estimativa);
+
+  const eventos = pontos.filter((p) => p.valor !== 0);
+  expect(eventos).toEqual([{ data: '2026-10-15', valor: -500, saldo: -500 }]);
+});
+
+test('projetarFluxoDeCaixaDiario: renda fixa estimada entra no dia 28 dos meses SEM receita avulsa própria', () => {
+  const pontos = projetarFluxoDeCaixaDiario(
+    [],
+    [],
+    0,
+    '2026-09-01',
+    40,
+    criarEstimativaVazia('2026-09'),
+    3000,
+  );
+
+  const eventos = pontos.filter((p) => p.valor !== 0);
+  // Só um evento: dia 28/09 (o mês seguinte, dia 28/10, cai fora da janela
+  // de 40 dias a partir de 01/09).
+  expect(eventos).toEqual([{ data: '2026-09-28', valor: 3000, saldo: 3000 }]);
+});
+
+test('projetarFluxoDeCaixaDiario: renda fixa estimada NÃO entra num mês que já tem receita avulsa própria lançada', () => {
+  const salarioAvulso = criarTransacao({ tipo: 'receita', frequencia: 'unica', valor: 4000, data: '2026-09-15' });
+  const pontos = projetarFluxoDeCaixaDiario(
+    [salarioAvulso],
+    [],
+    0,
+    '2026-09-01',
+    40,
+    criarEstimativaVazia('2026-09'),
+    3000,
+  );
+
+  const datasComRendaEstimada = pontos.filter((p) => p.valor === 3000);
+  expect(datasComRendaEstimada).toEqual([]);
 });
 
 test('calcularValorDaParcela sem juros é a divisão simples de sempre', () => {
@@ -923,11 +1054,25 @@ test('CASO REAL: a mesma meta não muda de veredito só porque começa no mês q
 
   expect(esteMes.viavel).toBe(false);
   expect(mesQueVem.viavel).toBe(false);
-  // O primeiro mês de cada janela sai igual: -123,40 (5760 - 2593,40 - 2790 - 500).
+  // Setembro (a meta começa dia 21, DEPOIS do salário do dia 5 e das
+  // contas do dia 10): o pior ponto do mês é o de sempre, no fim
+  // (5760 - 2593,40 - 2790 - 500 = -123,40).
   expect(esteMes.meses[0].saldo).toBeCloseTo(-123.4, 2);
-  expect(mesQueVem.meses[0].saldo).toBeCloseTo(-123.4, 2);
-  // A regra antiga dava "viável" pro mesmo cenário (variável = 0 em outubro).
-  expect(antigaMesQueVem.viavel).toBe(true);
+  // Outubro (a meta começa dia 1, ANTES do salário do dia 5): a parcela
+  // de R$500 sai no MESMO dia em que o mês começa, com o saldo ainda
+  // zerado — o dia a dia (motor por mês, versão anterior deste conserto)
+  // não via isso, só o saldo "no fim do mês" (-123,40, igual a setembro,
+  // por coincidência de estarem na mesma janela de 12 meses). O motor dia
+  // a dia mostra o ponto de verdade: -500, um risco REAL de timing que
+  // setembro não tem (lá a meta começa depois do salário).
+  expect(mesQueVem.meses[0].saldo).toBeCloseTo(-500, 2);
+  // Mesmo SEM a estimativa de gasto do dia a dia, o motor dia a dia já
+  // pega esse risco de timing sozinho — diferente da versão por mês
+  // (guardada como comentário histórico: a regra antiga, que só olhava o
+  // saldo no FIM do mês, dava "viável" pro mesmo cenário só por acaso da
+  // estimativa zerar o gasto variável de outubro).
+  expect(antigaMesQueVem.viavel).toBe(false);
+  expect(antigaMesQueVem.piorSaldo).toBeCloseTo(-500, 2);
 });
 
 test('calcularRendaEsperadaDoMes: recorrente + estimativa quando não há avulsa no mês', () => {

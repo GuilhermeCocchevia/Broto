@@ -11,21 +11,17 @@ import { interpolarCor } from '../utils/corPorValor';
 import { useCategoriasStore } from '../store/useCategoriasStore';
 import { useSimulacoesStore } from '../store/useSimulacoesStore';
 import { useTransacoesStore } from '../store/useTransacoesStore';
-import {
-  calcularParcelaEfetiva,
-  calcularRendaFixaMedia,
-  calcularRendaEsperadaDoMes,
-  obterSaldoAtual,
-} from '../logic/projecao';
-import { calcularDespesasTotaisDoMes } from '../logic/orcamentoMensal';
+import { calcularParcelaEfetiva, calcularRendaEsperadaDoMes } from '../logic/projecao';
+import { calcularDespesasTotaisDoMes, projetarSituacaoAtual, avaliarSituacaoAtual } from '../logic/orcamentoMensal';
 import { calcularSobraMensal, sugerirInvestimentoInicial } from '../logic/sobraMensal';
 import { useSaldoInicialStore } from '../store/useSaldoInicialStore';
+import { usePremissasDeProjecao } from '../hooks/usePremissasDeProjecao';
 import { formatarReal } from '../utils/formatarReal';
 import { ItemLista } from '../components/ItemLista';
 import { BotaoPrimario } from '../components/BotaoPrimario';
 import { useCategoriaPorId } from '../hooks/useCategoriaPorId';
 import type { RootStackParamList } from '../navigation/RootNavigator';
-import { mesAtualLocal } from '../utils/dataLocal';
+import { mesAtualLocal, hojeLocal } from '../utils/dataLocal';
 import { formatarDataBr } from '../utils/formatarDataBr';
 
 // Altura (em px) da faixa mais escura que sobra embaixo do botão "de pé" no
@@ -50,7 +46,6 @@ export default function SimuladorScreen() {
   const carregarSimulacoes = useSimulacoesStore((state) => state.carregar);
   const transacoes = useTransacoesStore((state) => state.transacoes);
   const carregarTransacoes = useTransacoesStore((state) => state.carregar);
-  const saldosIniciais = useSaldoInicialStore((state) => state.saldosIniciais);
   const carregarSaldoInicial = useSaldoInicialStore((state) => state.carregar);
   const categoriaPorId = useCategoriaPorId();
 
@@ -76,8 +71,12 @@ export default function SimuladorScreen() {
   // sobra pra um valor que não existia de verdade — mesmo erro de
   // raciocínio já corrigido na projeção do Simulador (ver
   // calcularSaldoProjetado em projecao.ts).
+  //
+  // `usePremissasDeProjecao` já centraliza saldoAtual/rendaFixaMensal/
+  // estimativa (mesma fonte que Detalhe da Simulação e Dashboard usam) —
+  // um lugar só, sem cada tela recalcular à própria maneira.
+  const { saldoAtual, rendaFixaMensal, estimativa } = usePremissasDeProjecao();
   const mesAtual = useMemo(() => mesAtualLocal(), []);
-  const rendaFixaMensal = useMemo(() => calcularRendaFixaMedia(transacoes), [transacoes]);
   // A renda esperada do mês não é só `rendaFixaMensal` (essa é só a
   // estimativa a partir de receitas AVULSAS passadas, pensada pra preencher
   // meses sem dado real) — precisa somar também qualquer receita
@@ -98,13 +97,26 @@ export default function SimuladorScreen() {
     () => calcularSobraMensal(rendaMensalEsperada, despesasDoMes, simulacoes, mesAtual),
     [rendaMensalEsperada, despesasDoMes, simulacoes, mesAtual],
   );
+  // Bug real corrigido (2026-09-27): "sobra esse mês" sozinho não basta —
+  // já vimos no Dashboard e no Detalhe de Simulação que um mês parecer
+  // tranquilo não significa nada sobre o que vem depois (um salário do
+  // fim do mês pode já ter destino nas contas do mês seguinte, ou o saldo
+  // pode ficar negativo daqui a alguns meses mesmo com esse mês de folga).
+  // Antes de convidar a investir, confere o mesmo motor dia a dia que o
+  // resto do app usa: só convida quando a situação está genuinamente
+  // tranquila olhando pra frente, não só "esse mês fechou no positivo".
+  const situacaoAtual = useMemo(() => {
+    const projecao = projetarSituacaoAtual(transacoes, simulacoes, saldoAtual, hojeLocal(), estimativa);
+    return avaliarSituacaoAtual(projecao);
+  }, [transacoes, simulacoes, saldoAtual, estimativa]);
+  const podeConvidarParaInvestir = sobraMensal > 0 && situacaoAtual.nivel === 'tranquilo';
   const temSimulacoes = simulacoes.length > 0;
   // Investimento inicial sugerido pro formulário aberto pelo botão do aviso
   // de sobra: só o que o saldo tem ALÉM de um mês de despesas (ver
   // sugerirInvestimentoInicial).
   const investimentoInicialSugerido = useMemo(
-    () => sugerirInvestimentoInicial(obterSaldoAtual(saldosIniciais, transacoes), despesasDoMes),
-    [saldosIniciais, transacoes, despesasDoMes],
+    () => sugerirInvestimentoInicial(saldoAtual, despesasDoMes),
+    [saldoAtual, despesasDoMes],
   );
 
   return (
@@ -127,7 +139,7 @@ export default function SimuladorScreen() {
             só pode estar descontando despesas reais (não existe simulação
             nenhuma pra descontar ainda); depois, deixa claro que já conta
             com o que já foi simulado. */}
-        {sobraMensal > 0 && (
+        {podeConvidarParaInvestir && (
           <View style={styles.avisoSobra}>
             <Text style={styles.avisoSobraTexto}>
               {temSimulacoes
