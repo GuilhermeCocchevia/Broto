@@ -4,6 +4,15 @@ Controle financeiro pessoal e simulador de decisões futuras — um app React Na
 
 Projeto pessoal, construído e refinado com dados reais de uso próprio: cada correção de lógica no motor de projeção nasceu de um caso real que os números não estavam capturando direito.
 
+<p align="center">
+  <img src="docs/screenshots/dashboard.png" width="220" alt="Dashboard com o card Situação atual avisando a data em que o saldo fica apertado" />
+  <img src="docs/screenshots/simulacao-compra.png" width="220" alt="Simulação de compra parcelada, com veredito e gráfico" />
+  <img src="docs/screenshots/simulacao-rendimento.png" width="220" alt="Simulação de aposentadoria, com projeção de crescimento" />
+  <img src="docs/screenshots/extrato.png" width="220" alt="Extrato de transações, coloridas por valor" />
+</p>
+
+*(dados fictícios de demonstração — o app nunca envia nada pra nenhum servidor)*
+
 ## Sobre o projeto
 
 A maioria dos apps de finanças pessoais soma receita e despesa por mês e para por aí. O problema é que isso esconde risco real: um salário que cai no dia 30 pode, na prática, ser o dinheiro que paga as contas do mês *seguinte* — e uma despesa que vence no dia 10 pode deixar o saldo negativo por semanas mesmo que o mês, no fechamento, termine positivo.
