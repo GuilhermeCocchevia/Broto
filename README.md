@@ -5,10 +5,11 @@ Controle financeiro pessoal e simulador de decisões futuras — um app React Na
 Projeto pessoal, construído e refinado com dados reais de uso próprio: cada correção de lógica no motor de projeção nasceu de um caso real que os números não estavam capturando direito.
 
 <p align="center">
-  <img src="docs/screenshots/dashboard.png" width="220" alt="Dashboard com o card Situação atual avisando a data em que o saldo fica apertado" />
-  <img src="docs/screenshots/simulacao-compra.png" width="220" alt="Simulação de compra parcelada, com veredito e gráfico" />
-  <img src="docs/screenshots/simulacao-rendimento.png" width="220" alt="Simulação de aposentadoria, com projeção de crescimento" />
-  <img src="docs/screenshots/extrato.png" width="220" alt="Extrato de transações, coloridas por valor" />
+  <img src="docs/screenshots/dashboard.png" width="190" alt="Dashboard com o card Situação atual avisando a data em que o saldo fica apertado" />
+  <img src="docs/screenshots/rever-gastos.png" width="190" alt="Tela Rever gastos, com a meta de corte e a sugestão 'Por onde começar'" />
+  <img src="docs/screenshots/simulacao-compra.png" width="190" alt="Simulação de compra parcelada, com veredito e gráfico" />
+  <img src="docs/screenshots/simulacao-rendimento.png" width="190" alt="Simulação de aposentadoria, com projeção de crescimento" />
+  <img src="docs/screenshots/extrato.png" width="190" alt="Extrato de transações, coloridas por valor" />
 </p>
 
 *(dados fictícios de demonstração — o app nunca envia nada pra nenhum servidor)*
@@ -103,3 +104,7 @@ ESLint (`eslint-config-expo`), incluindo as regras experimentais do plugin `reac
 ## Licença
 
 Todos os direitos reservados. Este repositório é público para fins de portfólio e avaliação técnica; uso, cópia ou redistribuição do código sem autorização do autor não são permitidos.
+
+## Autor
+
+Guilherme Rocha Cocchevia — [GitHub](https://github.com/GuilhermeCocchevia)
