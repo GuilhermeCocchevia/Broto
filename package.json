@@ -24,6 +24,7 @@
     "expo-linear-gradient": "~57.0.2",
     "expo-local-authentication": "~57.0.3",
     "expo-sharing": "~57.0.22",
+    "expo-splash-screen": "~57.0.9",
     "expo-sqlite": "~57.0.3",
     "expo-status-bar": "~57.0.1",
     "expo-symbols": "~57.0.3",

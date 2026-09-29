@@ -36,6 +36,15 @@
         {
           "faceIDPermission": "Use o Face ID para desbloquear o Broto."
         }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160,
+          "resizeMode": "contain",
+          "backgroundColor": "#FDF6E3"
+        }
       ]
     ]
   }
